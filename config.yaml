@@ -1,0 +1,43 @@
+# config.yaml | version 1.0.0 by Albert Sheng
+# NiXZ-121 examine rules & thresholds.
+# All numeric values are starting seeds, NOT literature standards.
+# Program must not hard-code thresholds elsewhere; edit this file (or use the
+# GUI Rules panel) to tune.
+
+grid: {n: 11}
+
+edge:                       # Ni K-edge; see NiXZ-121.md §3, §4.1
+  element: Ni
+  edge: K
+  e0_nominal_eV: 8333.0
+  e0_alt_eV: 8331.90
+  e0_nominal_tol_eV: 1.5
+  mono_offset_window_eV: [-5.0, 25.0]
+  ref_e0_search_eV: [8320.0, 8370.0]
+  ref_e0_spread_tol_eV: 0.3
+
+examine:
+  combine_mode: worst       # worst | weighted (weighted not implemented yet)
+  shape_grid_eV: [-30.0, 150.0, 0.3]   # relative to median E0: start, end, step
+
+rules:
+  GATE-EDGE:  {enabled: true,  min: 0.10, max: 1.5}
+  CAL-EREF:   {enabled: true}
+  R-SNR:      {enabled: true,  warn_z: 3, fail_z: 5}
+  R-NOISE-HF: {enabled: true,  warn_z: 3, fail_z: 5}
+  R-PRE-FLAT: {enabled: true,  warn_z: 3, fail_z: 5}
+  R-GLITCH:   {enabled: true,  warn_z: 3, fail_z: 5, max_count: 5}
+  C-SHAPE:    {enabled: true,  warn_z: 3, fail_z: 5}
+  C-E0-NBR:   {enabled: true,  warn_z: 3, fail_z: 5}
+  T-DRIFT:        {enabled: false}
+  T-UPDOWN:       {enabled: false}
+  T-OUTLIER-SCAN: {enabled: false}
+  T-SATURATION:   {enabled: false}
+
+db:
+  enabled: false            # MySQL disabled until schema finalized
+  host: localhost
+  port: 3306
+  schema: xanes
+  user: xanes
+  password_env: XANES_DB_PASSWORD   # env var only; do not put password in file

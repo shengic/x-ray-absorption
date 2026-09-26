@@ -1,5 +1,6 @@
-# version 1.0 by Albert Sheng
+# version 1.1 by Albert Sheng
 numpy>=2.0
 matplotlib>=3.10
 xraylarch>=2026.3
+pyyaml>=6.0
 pytest>=8.0

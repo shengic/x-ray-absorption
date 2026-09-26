@@ -11,7 +11,7 @@ and caches results:
 
 where {stem} = "X{j}_{x}_{start}_{end}".
 
-version 1.0 by Albert Sheng
+version 1.1 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -22,6 +22,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+
+PIPELINE_VERSION = "1.1"
 
 DATA_ROOT = Path("data")
 IMAGE_ROOT = Path("image")

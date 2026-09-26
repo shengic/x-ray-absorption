@@ -1,4 +1,4 @@
-<!-- version 1.0 by Albert Sheng -->
+<!-- version 1.1 by Albert Sheng -->
 
 # NiXZ-121 XANES Analyzer
 
@@ -16,15 +16,24 @@ Pipeline: raw `.txt` → [`larch.xafs.pre_edge()`](https://xraypy.github.io/xray
 - **Batch pipeline** — parses JAQ QEXAFS text files, runs `pre_edge()`,
   computes Q1–Q6 (edge step, high-freq noise, pre-edge flatness, E₀ shift vs
   `mu_ref`, glitch count, white-line height), and caches everything.
+- **Examine (rule-based)** — 8 configurable rules produce two flags per cell:
+  `smooth` (measurement quality) and `consistent` (agreement with the rest
+  of the grid). Rules are individually toggleable via a GUI panel or
+  `config.yaml`; per-cell verdict + `usable` tag written to
+  `data/**/*.examine.json`. `usable = GATE-EDGE PASS AND smooth in {PASS, WARN}`.
 - **Tkinter GUI** — three-panel browser (Z folders → X sections → info),
   light-blue progress bar during batch runs, **singleton** plot windows
   (Pre-edge / Normalized / Combined; each refreshes in place instead of
-  stacking), an 11 × 11 edge-step heatmap, and an Exit button.
-- **Cache** — per-section `.npz` (arrays) + `.json` (scalar metrics) under
-  `data/`; PNG plots under `image/`. Layout is 1-to-1 with the MySQL schema
-  planned in `NiXZ-121.md` §6.
-- **Tests** — 58 pytest tests covering regex/naming, discovery, data format,
-  pipeline round-trip, metric shapes, cache I/O, and a GUI smoke test.
+  stacking), Examine + Rules toggle panel, 11 × 11 heatmap with combobox
+  coloring (raw metrics or examine flags), click-to-select a cell, and an
+  Exit button.
+- **Cache** — per-section `.npz` (arrays) + `.json` (scalar metrics) +
+  `.examine.json` (rule verdicts) under `data/`; PNG plots under `image/`.
+  Layout is 1-to-1 with the MySQL schema planned in `NiXZ-121.md` §6
+  (MySQL wiring deferred until schema is finalized).
+- **Tests** — 68 pytest tests covering regex/naming, discovery, data format,
+  pipeline round-trip, metric shapes, cache I/O, GUI smoke, and the examine
+  engine (rules, N/A propagation, config hash, flag combine).
 
 ## Install
 
@@ -60,8 +69,24 @@ On launch you'll be prompted for the dataset root — a folder containing
 Batch (headless, no GUI):
 
 ```
-python main.py --batch image_AI_Ni
+python main.py --batch image_AI_Ni                    # pipeline only
+python main.py --examine image_AI_Ni                  # rule-based examine (needs cache)
+python main.py --batch image_AI_Ni --examine image_AI_Ni  # both
 ```
+
+## Rule-based examine
+
+`config.yaml` at the repo root defines the 8 rules and their thresholds.
+In the GUI, `Rules...` opens a toggle panel — check/uncheck each rule,
+edit its z-score thresholds, and hit **Apply & Examine**. The heatmap can
+color by any raw metric or by the resulting flag (green / yellow / red /
+grey) — pick from the combobox above the heatmap.
+
+Rule dependencies (`requires`) are enforced: disabling `CAL-EREF` propagates
+N/A to `C-SHAPE` and `C-E0-NBR` (with reason `"requires CAL-EREF (disabled)"`).
+Disabling all `smooth` rules yields `smooth: N/A` and `usable: NO`.
+
+## Storage layout
 
 ## Tests
 
@@ -75,9 +100,11 @@ See [`test/README.md`](test/README.md) for a per-file breakdown.
 
 ```
 data/
+  examine_run.json               run manifest (uuid, config, config_hash, stats)
   Z0_-5/
-    X0_5_1_120.npz      energy, mu, mu_ref, pre_edge, post_edge, norm, flat, e0, edge_step (float32)
-    X0_5_1_120.json     i,j,z,x, seg_start/end, pre1/pre2/norm1/norm2/nnorm/nvict, Q1-Q6, usable
+    X0_5_1_120.npz               energy, mu, mu_ref, pre_edge, post_edge, norm, flat, e0, edge_step
+    X0_5_1_120.json              pipeline metadata + Q1-Q6
+    X0_5_1_120.examine.json      per-cell verdict: smooth, consistent, usable, per-rule level/value/reason
     ...
 image/
   Z0_-5/
@@ -94,6 +121,8 @@ Filename stem: `X{j}_{x}_{start}_{end}` (mirrors source). Folder disambiguates Z
   format, naming rules, 11 × 11 matrix, pipeline, quality metrics, DB schema.
 - [`HANDOFF.md`](HANDOFF.md) — architectural handoff for AI agents or new
   contributors; explains code structure, invariants, and next steps.
+- [`TASK_examine_rules.md`](TASK_examine_rules.md) — Phase 2 examine spec;
+  §12 records implementation deviations from the original assumption doc.
 - [`test/README.md`](test/README.md) — test suite guide.
 
 ## Roadmap
@@ -108,4 +137,4 @@ Items still open (from `NiXZ-121.md` §8):
 
 ---
 
-version 1.0 by Albert Sheng
+version 1.1 by Albert Sheng

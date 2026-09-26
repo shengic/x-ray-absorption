@@ -1,4 +1,4 @@
-<!-- version 1.0 by Albert Sheng -->
+<!-- version 1.1 by Albert Sheng -->
 
 # Handoff — NiXZ-121 XANES Analyzer
 
@@ -27,15 +27,19 @@ we compute 6 quality metrics (Q1–Q6) and a boolean `usable` flag.
 ## 2. Repository layout
 
 ```
-main.py           tkinter GUI + --batch CLI entry
-pipeline.py       pure-logic: parse, pre_edge, metrics, cache I/O, figure builders
-test/             pytest suite (58 tests, ~4 s)
-NiXZ-121.md       consolidated project doc: data format, naming, matrix,
-                  Q1-Q7 definitions, DB schema
-README.md         user-facing quickstart
-HANDOFF.md        this file
-requirements.txt  pinned-loose dep list
-.gitignore        excludes data/, image/, image_AI_Ni/, .venv/
+main.py               tkinter GUI + --batch / --examine CLI entry
+pipeline.py           Phase 1: parse, pre_edge, metrics, cache I/O, figure builders
+rules.py              Phase 2: Rule dataclass, REGISTRY, 8 rule implementations
+examine.py            Phase 2: context builder, topological execution, verdict writer
+config.yaml           rules + thresholds + edge config + (disabled) db config
+test/                 pytest suite (68 tests, ~14 s)
+NiXZ-121.md           consolidated project doc: data format, naming, matrix,
+                      Q1-Q7 definitions, DB schema
+TASK_examine_rules.md Phase 2 spec + implementation-deviation log (§12)
+README.md             user-facing quickstart
+HANDOFF.md            this file
+requirements.txt      pinned-loose dep list
+.gitignore            excludes data/, image/, image_AI_Ni/, .venv/
 ```
 
 At runtime (excluded from git):
@@ -207,6 +211,79 @@ Files:
    at ~12.5 GB each; format unclear).
 5. **MySQL migration** — currently file-cache; schema drafted in `NiXZ-121.md` §6.1.
 
+## 10a. Phase 2 — Examine (rule-based)
+
+Added on top of the Phase 1 pipeline without altering its outputs.
+
+**Files**: `rules.py` (Rule dataclass + REGISTRY + 8 rules), `examine.py`
+(Context builder + topological execution + verdict writer), `config.yaml`.
+
+**Flag semantics**:
+- `smooth` — measurement quality (Q2, Q3, Q5, SNR)
+- `consistent` — chemistry agreement with the grid (shape residual vs
+  cross-cell median; corrected E₀ vs 8-neighbor median)
+- `usable = GATE-EDGE PASS AND smooth in {PASS, WARN}`
+
+Levels are PASS(0)/WARN(1)/FAIL(2)/None(N/A). Combine mode is `worst` — the
+flag equals the highest level among all *evaluated* rules for that flag.
+`weighted` is reserved (raises `NotImplementedError`).
+
+**Dependency propagation**: If a required rule is disabled or non-PASS,
+downstream rules become N/A with reason `"requires X (disabled)"` or
+`"requires X (FAIL)"`. Baseline stats (median/MAD) use only cells that
+passed `GATE-EDGE`.
+
+**Output** (per section):
+```
+data/{Zdir}/{stem}.examine.json    -- verdict + per-rule {level, value, reason}
+data/examine_run.json              -- run manifest: uuid, config, config_hash, stats
+```
+Multiple runs overwrite the per-cell json (single verdict at a time).
+When schema is finalized, migrating to MySQL is one-to-one:
+`examine_run.json → qc_run`, per-rule dict → `qc_rule_result`, verdict → `qc_verdict`.
+
+**GUI additions** (all singleton windows keyed by kind):
+- Top bar: `Examine 121`, `Rules...` buttons
+- Rules panel: checkbox per rule + editable Entry per numeric parameter;
+  "Apply & Examine" re-runs; "Save to config.yaml" checkbox is off by default
+- Heatmap: `Color by:` combobox including raw metrics and (after examine)
+  `smooth`/`consistent`/`usable`. Flag mode uses a ListedColormap
+  (green/yellow/red/grey) with in-cell text overlay. Click a cell to
+  select it in the left listboxes.
+- Section info: adds `smooth: (n_eval/n_enabled) — <first hit>`,
+  `consistent`, and rule-based `usable`; the legacy single-cell heuristic is
+  renamed to `usable (single-cell, legacy)` and kept for comparison.
+
+**CLI**:
+```
+python main.py --batch ROOT              # Phase 1 only
+python main.py --examine ROOT            # Phase 2 only (needs cache)
+python main.py --batch ROOT --examine ROOT   # both
+```
+
+**Adding a new rule** (the whole point of Phase 2):
+1. Add a `@rl.rule(id, flag, scope, requires=(...))` function in `rules.py`
+   returning `RuleResult(level, value, reason)`.
+2. Add its default settings under `rules:` in `config.yaml`.
+   Nothing in `examine.py` changes; topological sort picks it up.
+
+**Sharp edges in this phase**:
+- Robust MAD-scaled z-score: if the grid is unrealistically uniform, MAD
+  can be 0 and the rule returns N/A. Real data will have jitter. Tests
+  seed jitter to avoid a false MAD=0 result.
+- `GATE-EDGE` failing removes the cell from *baseline* stats (median/MAD),
+  which is why we run gate first, then compute stats over gate-passing cells.
+- `CAL-EREF` is a `grid`-scope gate: L1 checks `mu_ref_e0 − e0_nominal` is
+  within the monochromator window; L3 checks spread vs the grid median.
+  When disabled, downstream `consistent` rules become N/A but `smooth`
+  still runs.
+- `mu_ref_shift[k] = mu_ref_e0[k] − median(mu_ref_e0)` — applied to both
+  the `energy` axis (for shape interpolation onto the common grid) and the
+  `e0` (for `C-E0-NBR` neighbor comparison).
+- `C-SHAPE` interpolates each cell's `norm` onto a common grid
+  `[E₀_med − 30, E₀_med + 150]` at 0.3 eV step. Cells whose energy range
+  doesn't cover the grid contribute nothing (they get N/A on C-SHAPE).
+
 ## 11. Sharp edges to remember
 
 - Windows glob is **case-insensitive**; always filter with `FNAME_RE`.
@@ -223,4 +300,4 @@ Files:
 
 ---
 
-version 1.0 by Albert Sheng
+version 1.1 by Albert Sheng
