@@ -45,6 +45,8 @@ BASE_CONFIG = {
         "R-NOISE-HF": {"enabled": True, "warn_z": 3, "fail_z": 5},
         "R-PRE-FLAT": {"enabled": True, "warn_z": 3, "fail_z": 5},
         "R-GLITCH":   {"enabled": True, "warn_z": 3, "fail_z": 5, "max_count": 5},
+        "R-EDGE-FWHM":  {"enabled": True, "warn_z": 3, "fail_z": 5},
+        "R-NORM-COEFS": {"enabled": True, "warn_z": 3, "fail_z": 5},
         "C-SHAPE":    {"enabled": True, "warn_z": 3, "fail_z": 5},
         "C-E0-NBR":   {"enabled": True, "warn_z": 3, "fail_z": 5},
     },
@@ -75,6 +77,10 @@ def _write_synthetic_cell(dataset_root: Path, data_root: Path,
                            q3_pre_flatness: float = 0.005,
                            q5_glitches: int = 0,
                            q6_white_line: float = 1.25,
+                           edge_fwhm_eV: float = 1.0,
+                           pre_slope: float = 0.0,
+                           norm_c1: float = 0.0,
+                           norm_c2: float = 0.0,
                            e0: float = 8346.0,
                            mu_ref_e0: float = 8333.10,
                            norm: np.ndarray | None = None,
@@ -126,6 +132,11 @@ def _write_synthetic_cell(dataset_root: Path, data_root: Path,
         "q4_e0_shift_vs_ref": e0 - mu_ref_e0,
         "q5_glitches": q5_glitches,
         "q6_white_line": q6_white_line,
+        "edge_fwhm_eV": edge_fwhm_eV,
+        "pre_slope": pre_slope,
+        "norm_c0": 0.5,
+        "norm_c1": norm_c1,
+        "norm_c2": norm_c2,
         "mu_ref_e0": mu_ref_e0,
         "usable": True,
     }
@@ -153,6 +164,10 @@ def synthetic_grid(tmp_path, monkeypatch):
                 edge_step=float(0.5 + rng.normal(0, 0.02)),
                 mu_ref_e0=float(8333.10 + rng.normal(0, 0.05)),
                 e0=float(8346.0 + rng.normal(0, 0.05)),
+                edge_fwhm_eV=float(1.0 + rng.normal(0, 0.03)),
+                pre_slope=float(rng.normal(0, 1e-4)),
+                norm_c1=float(rng.normal(0, 1e-5)),
+                norm_c2=float(rng.normal(0, 1e-8)),
             )
     return {"dataset_root": dataset_root, "data_root": data_root}
 
@@ -163,9 +178,10 @@ def _cfg():
 
 # --------- Tests ---------
 
-def test_registry_contains_all_9_rules():
+def test_registry_contains_all_11_rules():
     for rid in ("GATE-EDGE", "CAL-EREF", "R-SNR", "R-NOISE-HF", "R-PRE-FLAT",
-                "R-GLITCH", "C-SHAPE", "C-E0-NBR", "C-CUMDIFF"):
+                "R-GLITCH", "R-EDGE-FWHM", "R-NORM-COEFS",
+                "C-SHAPE", "C-E0-NBR", "C-CUMDIFF"):
         assert rid in rl.REGISTRY, rid
 
 
@@ -253,7 +269,8 @@ def test_disable_cal_eref_propagates_na_to_consistent(synthetic_grid):
 
 def test_disable_all_smooth_rules_yields_na_and_not_usable(synthetic_grid):
     cfg = _cfg()
-    for rid in ("R-SNR", "R-NOISE-HF", "R-PRE-FLAT", "R-GLITCH"):
+    for rid in ("R-SNR", "R-NOISE-HF", "R-PRE-FLAT", "R-GLITCH",
+                "R-EDGE-FWHM", "R-NORM-COEFS"):
         cfg["rules"][rid]["enabled"] = False
     run = examine.run_examine(synthetic_grid["dataset_root"], cfg,
                               data_root=synthetic_grid["data_root"])
@@ -282,6 +299,60 @@ def test_examine_persists_per_cell_and_run_json(synthetic_grid):
     assert per["run_id"] == run.run_id
     assert per["smooth"] in ("PASS", "WARN", "FAIL", "N/A")
     assert per["consistent"] in ("PASS", "WARN", "FAIL", "N/A")
+
+
+def test_r_edge_fwhm_flags_broadened_cell(synthetic_grid):
+    """Inject a cell with 3x baseline FWHM -> R-EDGE-FWHM should trip."""
+    root = synthetic_grid["dataset_root"]
+    data = synthetic_grid["data_root"]
+    _write_synthetic_cell(root, data, i=5, j=5, edge_fwhm_eV=3.0)
+    run = examine.run_examine(root, _cfg(), data_root=data)
+    v = run.verdicts[(5, 5)]
+    assert v["rules"]["R-EDGE-FWHM"]["level_name"] in ("WARN", "FAIL")
+    assert v["smooth"] in ("WARN", "FAIL")
+
+
+def test_r_edge_fwhm_flags_narrowed_cell(synthetic_grid):
+    """FWHM well below baseline is also flagged (two-sided z)."""
+    root = synthetic_grid["dataset_root"]
+    data = synthetic_grid["data_root"]
+    _write_synthetic_cell(root, data, i=6, j=4, edge_fwhm_eV=0.2)
+    run = examine.run_examine(root, _cfg(), data_root=data)
+    assert run.verdicts[(6, 4)]["rules"]["R-EDGE-FWHM"]["level_name"] in ("WARN", "FAIL")
+
+
+def test_r_norm_coefs_flags_pre_slope_outlier(synthetic_grid):
+    """A pre_slope far outside the baseline distribution -> WARN/FAIL."""
+    root = synthetic_grid["dataset_root"]
+    data = synthetic_grid["data_root"]
+    _write_synthetic_cell(root, data, i=2, j=8, pre_slope=0.05)  # ~500x MAD
+    run = examine.run_examine(root, _cfg(), data_root=data)
+    v = run.verdicts[(2, 8)]
+    assert v["rules"]["R-NORM-COEFS"]["level_name"] in ("WARN", "FAIL")
+    assert "pre_slope" in v["rules"]["R-NORM-COEFS"]["reason"]
+
+
+def test_r_norm_coefs_na_when_field_missing(tmp_path, monkeypatch):
+    """Older cache without pre_slope/norm_c1/norm_c2 should return N/A
+    with a 'reprocess needed' reason -- not crash."""
+    dataset_root = tmp_path / "raw"
+    data_root = tmp_path / "data"
+    monkeypatch.setattr(pl, "DATA_ROOT", data_root)
+    monkeypatch.setattr(pl, "IMAGE_ROOT", tmp_path / "image")
+    rng = np.random.default_rng(1)
+    for i in range(11):
+        for j in range(11):
+            _write_synthetic_cell(dataset_root, data_root, i, j)
+    # Strip norm coefficients from every meta json to simulate legacy cache
+    for jf in data_root.rglob("*.json"):
+        meta = json.loads(jf.read_text(encoding="utf-8"))
+        for k in ("pre_slope", "norm_c1", "norm_c2"):
+            meta.pop(k, None)
+        jf.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    run = examine.run_examine(dataset_root, _cfg(), data_root=data_root)
+    r = run.verdicts[(5, 5)]["rules"]["R-NORM-COEFS"]
+    assert r["level"] is None
+    assert "reprocess" in r["reason"].lower()
 
 
 def test_c_cumdiff_disabled_by_default_in_base_config(synthetic_grid):

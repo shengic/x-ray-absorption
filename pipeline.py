@@ -11,7 +11,7 @@ and caches results:
 
 where {stem} = "X{j}_{x}_{start}_{end}".
 
-version 1.1 by Albert Sheng
+version 1.2 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
-PIPELINE_VERSION = "1.1"
+PIPELINE_VERSION = "1.2"
 
 DATA_ROOT = Path("data")
 IMAGE_ROOT = Path("image")
@@ -115,6 +115,48 @@ def run_pre_edge(energy, mu):
     return g
 
 
+def edge_fwhm_eV(energy: np.ndarray, mu: np.ndarray, e0: float,
+                  window: float = 15.0) -> float:
+    """FWHM (in eV) of the dμ/dE peak inside E0 ± window. Sub-pixel linear
+    interpolation on the half-max crossings. Returns NaN if the derivative
+    peak isn't well defined in the window."""
+    energy = np.asarray(energy, dtype=float)
+    mu = np.asarray(mu, dtype=float)
+    mask = (energy >= e0 - window) & (energy <= e0 + window)
+    e = energy[mask]
+    if len(e) < 5:
+        return float("nan")
+    d = np.gradient(mu[mask], e)
+    peak_val = float(np.max(d))
+    if peak_val <= 0:
+        return float("nan")
+    peak_idx = int(np.argmax(d))
+    half = peak_val / 2.0
+
+    left_idx = None
+    for i in range(peak_idx, -1, -1):
+        if d[i] <= half:
+            left_idx = i
+            break
+    right_idx = None
+    for i in range(peak_idx, len(d)):
+        if d[i] <= half:
+            right_idx = i
+            break
+    if left_idx is None or right_idx is None:
+        return float("nan")
+
+    def _crossing(i0: int, i1: int) -> float:
+        if d[i1] == d[i0]:
+            return 0.5 * (e[i0] + e[i1])
+        t = (half - d[i0]) / (d[i1] - d[i0])
+        return float(e[i0] + t * (e[i1] - e[i0]))
+
+    e_left = _crossing(left_idx, left_idx + 1) if left_idx + 1 <= peak_idx else float(e[left_idx])
+    e_right = _crossing(right_idx - 1, right_idx) if right_idx - 1 >= peak_idx else float(e[right_idx])
+    return e_right - e_left
+
+
 def compute_metrics(g, mu_ref_e0: float | None = None) -> dict:
     e0 = float(g.e0)
     step = float(g.edge_step)
@@ -146,6 +188,8 @@ def compute_metrics(g, mu_ref_e0: float | None = None) -> dict:
 
     q4 = float(e0 - mu_ref_e0) if mu_ref_e0 is not None else None
 
+    fwhm = edge_fwhm_eV(energy, mu, e0, window=15.0)
+
     return {
         "e0": e0,
         "edge_step": step,
@@ -155,6 +199,7 @@ def compute_metrics(g, mu_ref_e0: float | None = None) -> dict:
         "q4_e0_shift_vs_ref": q4,
         "q5_glitches": q5,
         "q6_white_line": q6,
+        "edge_fwhm_eV": fwhm,
     }
 
 
@@ -277,6 +322,10 @@ def process_section(sec: Section, force: bool = False) -> dict:
         "pre1": float(det.pre1), "pre2": float(det.pre2),
         "norm1": float(det.norm1), "norm2": float(det.norm2),
         "nnorm": int(det.nnorm), "nvict": int(det.nvict),
+        "pre_slope": float(det.pre_slope),
+        "norm_c0": float(det.norm_c0),
+        "norm_c1": float(det.norm_c1),
+        "norm_c2": float(getattr(det, "norm_c2", 0.0)),
         **metrics,
     }
 

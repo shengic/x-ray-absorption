@@ -1,11 +1,11 @@
-<!-- README.md | version 2.0.1 by Albert Sheng | 知識庫文件路徑改為 doc/ -->
+<!-- README.md | version 2.0.2 by Albert Sheng | R-EDGE-FWHM + R-NORM-COEFS 加入 -->
 
 # NiXZ-121 XANES Analyzer
 
 Quality assessment for **NiXZ-121** — an 11 × 11 grid of QEXAFS scans of a
 Ni sample (121 sections total). Pipeline: raw `.txt` →
 [`larch.xafs.pre_edge()`](https://xraypy.github.io/xraylarch/xafs_preedge.html)
-→ 6 quality metrics → 9 rule-based verdicts → Tk GUI + heatmaps.
+→ 6 quality metrics → 11 rule-based verdicts → Tk GUI + heatmaps.
 
 ---
 
@@ -15,9 +15,10 @@ Ni sample (121 sections total). Pipeline: raw `.txt` →
   `pre_edge()`, computes Q1–Q6 (edge step, HF noise, pre-edge flatness,
   E₀ shift vs `mu_ref`, glitch count, white-line height), caches arrays +
   metrics + PNG plots.
-- **Phase 2 examine** (`rules.py`, `examine.py`) — 9 configurable rules
+- **Phase 2 examine** (`rules.py`, `examine.py`) — 11 configurable rules
   produce two flags per cell:
-  - `smooth` — measurement quality (`R-SNR`, `R-NOISE-HF`, `R-PRE-FLAT`, `R-GLITCH`)
+  - `smooth` — measurement quality (`R-SNR`, `R-NOISE-HF`, `R-PRE-FLAT`,
+    `R-GLITCH`, `R-EDGE-FWHM`, `R-NORM-COEFS`)
   - `consistent` — grid-wide agreement (`C-SHAPE`, `C-E0-NBR`, `C-CUMDIFF`)
   - plus gates `GATE-EDGE`, `CAL-EREF`
   - `usable = GATE-EDGE PASS AND smooth in {PASS, WARN}`
@@ -36,10 +37,11 @@ Ni sample (121 sections total). Pipeline: raw `.txt` →
   manifest with `config_hash`), `image/**/*.png` (plots). 1-to-1 map onto
   the MySQL schema in `doc/NiXZ-121_project.md` §6 — MySQL wiring deferred
   until the schema is finalized.
-- **Tests** — 73 pytest tests covering regex/naming, discovery, data
+- **Tests** — 79 pytest tests covering regex/naming, discovery, data
   format, pipeline round-trip, metric shapes, cache I/O, GUI smoke,
   examine engine (rules, N/A propagation, config-hash determinism,
-  flag combine, lippold_c7 identities, C-CUMDIFF jump detection).
+  flag combine, lippold_c7 identities, C-CUMDIFF jump detection,
+  R-EDGE-FWHM broaden/narrow detection, R-NORM-COEFS legacy-cache handling).
 
 ## Install
 
@@ -135,7 +137,7 @@ Filename stem `X{j}_{x}_{start}_{end}` mirrors the source; folder disambiguates 
 ```
 main.py                tkinter GUI + --batch / --examine CLI
 pipeline.py            Phase 1: parse, pre_edge, metrics, cache I/O, figure builders
-rules.py               Phase 2: Rule dataclass + REGISTRY + 9 rules + lippold_c7 helper
+rules.py               Phase 2: Rule dataclass + REGISTRY + 11 rules + lippold_c7 helper
 examine.py             Phase 2: context builder + topological execution + verdict writer
 config.yaml            rules + thresholds + edge config + (disabled) db config
 requirements.txt       numpy, matplotlib, xraylarch, pyyaml, pytest

@@ -84,3 +84,23 @@ def test_pngs_have_content(sample_txt, data_root, tmp_cache):
     pl.process_section(sec)
     assert sec.preedge_png.stat().st_size > 1024
     assert sec.norm_png.stat().st_size > 1024
+
+
+def test_meta_includes_fwhm_and_norm_coefs(sample_txt, data_root, tmp_cache):
+    """v1.2 addition: edge_fwhm_eV + pre_slope + norm_c0/c1/c2 must land in JSON meta."""
+    import json
+    sec = pl.parse_section(sample_txt, data_root)
+    pl.process_section(sec)
+    meta = json.loads(sec.json_path.read_text(encoding="utf-8"))
+    assert 0.1 < meta["edge_fwhm_eV"] < 20.0
+    for k in ("pre_slope", "norm_c0", "norm_c1", "norm_c2"):
+        assert k in meta, k
+
+
+def test_edge_fwhm_eV_helper_on_synthetic_arctan():
+    """FWHM of arctan-based derivative should be a few eV; sanity."""
+    import numpy as np
+    e = np.linspace(8300, 8400, 2001)
+    mu = 0.5 * (0.5 + np.arctan((e - 8346.0) / 2.0) / np.pi)
+    fwhm = pl.edge_fwhm_eV(e, mu, e0=8346.0, window=15.0)
+    assert 3.0 < fwhm < 10.0

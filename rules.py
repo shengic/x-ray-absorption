@@ -6,7 +6,7 @@ and returns RuleResult(level, value, reason).
 
 Levels: PASS(0), WARN(1), FAIL(2), None = N/A.
 
-version 1.1.0 by Albert Sheng
+version 1.2.0 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -161,6 +161,58 @@ def _r_pre_flat(ctx, cell, params) -> RuleResult:
     v = cell.meta.get("q3_pre_flatness")
     return _upper_z(v, ctx.stats.get("q3_pre_flatness"), params,
                     "q3_pre_flatness missing")
+
+
+@rule("R-EDGE-FWHM", flag="smooth", scope="grid", requires=("GATE-EDGE",))
+def _r_edge_fwhm(ctx, cell, params) -> RuleResult:
+    """Two-sided MAD z-score on the FWHM of dμ/dE around E0.
+    Broadening (too large) suggests thickness effect, inhomogeneity, or
+    beam vibration; unusually narrow (too small) suggests white-line loss
+    or E0 mis-identification. Grid-relative — self-tunes to whatever
+    beamline resolution the measurement session had (Gaur 2026 absolute
+    window 0.5-2.0 eV is only a sanity range, not used here)."""
+    v = cell.meta.get("edge_fwhm_eV")
+    return _two_sided_z(v, ctx.stats.get("edge_fwhm_eV"), params,
+                        "edge_fwhm_eV missing (reprocess needed)")
+
+
+@rule("R-NORM-COEFS", flag="smooth", scope="grid", requires=("GATE-EDGE",))
+def _r_norm_coefs(ctx, cell, params) -> RuleResult:
+    """Covers §5.2 A Q3: normalization sanity. Combines pre_slope and the
+    two post-edge polynomial coefficients norm_c1, norm_c2 by taking the
+    single worst |z| among the three (MAD-scaled against grid median).
+    Detects scattering, harmonics, saturation, or misplaced pre/post-edge
+    windows -- issues that a well-behaved 121-grid should not share."""
+    values = {
+        "pre_slope": cell.meta.get("pre_slope"),
+        "norm_c1": cell.meta.get("norm_c1"),
+        "norm_c2": cell.meta.get("norm_c2"),
+    }
+    if any(v is None for v in values.values()):
+        return RuleResult(None, None,
+                          "norm coefficients missing (reprocess needed)")
+    warn_z = params.get("warn_z", 3)
+    fail_z = params.get("fail_z", 5)
+    worst_z = None
+    worst_name = None
+    for name, v in values.items():
+        stats = ctx.stats.get(name)
+        if not stats:
+            continue
+        z = _robust_z(float(v), stats["median"], stats["mad_scaled"])
+        if z is None:
+            continue
+        if worst_z is None or abs(z) > abs(worst_z):
+            worst_z = z
+            worst_name = name
+    if worst_z is None:
+        return RuleResult(None, None, "no baseline stats for any coefficient")
+    az = abs(worst_z)
+    if az >= fail_z:
+        return RuleResult(FAIL, worst_z, f"{worst_name}: |z|={az:.2f} > {fail_z}")
+    if az >= warn_z:
+        return RuleResult(WARN, worst_z, f"{worst_name}: |z|={az:.2f} > {warn_z}")
+    return RuleResult(PASS, worst_z, f"{worst_name}: z={worst_z:+.2f}")
 
 
 @rule("R-GLITCH", flag="smooth", scope="grid", requires=("GATE-EDGE",))

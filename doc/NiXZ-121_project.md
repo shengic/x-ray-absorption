@@ -1,4 +1,4 @@
-<!-- NiXZ-121_project.md | version 1.3.1 by Albert Sheng | 2026-09-27 | §9 參考資料改為表格（含查證狀態） -->
+<!-- NiXZ-121_project.md | version 1.4.0 by Albert Sheng | 2026-09-27 | R-EDGE-FWHM + R-NORM-COEFS 已實作，補入 §5.1.1 -->
 
 # NiXZ-121 XANES 區段品質分析 — 專案整合文件
 
@@ -223,6 +223,8 @@ edge:
 | R-PRE-FLAT | 文獻相近 | TXM-Wizard (b) 檢查斜率，本專案改查殘差 |
 | R-NOISE-HF | 本專案設計 | — |
 | R-GLITCH | 本專案設計 | — |
+| R-EDGE-FWHM（**v1.4 起實作**） | 文獻概念、本專案延伸 | Gaur 2026 用絕對窗 0.5–2.0 eV 判解析度；本專案改用 grid-relative MAD z（雙側）以自校準 beamline 解析度。Stern & Kim 1981 為厚度寬化的物理依據。實作於 `pipeline.edge_fwhm_eV` + `rules._r_edge_fwhm` |
+| R-NORM-COEFS（**v1.4 起實作**；對應 §5.2 A Q3） | 文獻概念 | TXM-Wizard (b) 正規化濾波延伸。取 `pre_slope`、`norm_c1`、`norm_c2` 三者對全圖中位數的 MAD z-score 之 `max\|z\|`，抓 scattering／諧波／飽和／pre-post 窗誤設。實作於 `rules._r_norm_coefs`；larch 係數由 `pipeline.process_section` 一併存入 `.json` |
 | C-SHAPE | 部分文獻 | R-factor（Ravel & Newville 2005）延伸至中位光譜比較 |
 | C-E0-NBR | 本專案設計 | 概念近似 TXM-Wizard 邊能分群 |
 | C-CUMDIFF（新增，選用；**v1.3 起實作**） | 文獻方法、本專案延伸 | Lippold 2005 判準 7，參考改為 8 鄰格平均。實作於 `rules.lippold_c7` + `rules._c_cumdiff` + `examine._compute_cumdiff`；預設 `enabled: false`，由 Rules 面板或 config 開啟 |
@@ -242,7 +244,7 @@ edge:
 | Q1 | 邊緣訊雜比 | Δμ₀ ÷ σ_pre（前緣直線擬合殘差標準差） | 對應 TXM-Wizard (a)，起點 ≥ 8 |
 | Q1b | Δμ₀ 絕對值 | pre_edge 輸出，設**上下限** | 太小＝薄／空洞／未打到樣品；太大（Δμt ≳ 1.5 或總 μt ≳ 2.5）＝厚度效應壓低 white line |
 | Q2 | 後緣雜訊 | E₀+150 eV 以上 flat 的高通殘差 RMS（norm 單位） | 平滑度主指標 |
-| Q3 | 正規化合理性 | pre_slope、norm_c1、norm_c2 相對全圖中位數的 MAD 偏離 | 對應 TXM-Wizard (b)；散射、漏光、諧波污染 |
+| Q3 | 正規化合理性 | pre_slope、norm_c1、norm_c2 相對全圖中位數的 MAD 偏離 | 對應 TXM-Wizard (b)；散射、漏光、諧波污染。**v1.4 起由 `R-NORM-COEFS` 規則實作** |
 | Q4 | 邊緣位置 | 校正後 E₀ 或 norm = 0.5 能量，與 8 鄰格中位數之差 | 空間離群或化學態不同 |
 | Q5 | 形狀相似度 | 對 121 格中位光譜的 R-factor | 形狀異常 |
 | Q6 | glitch | 一階差分穩健 z-score > 5 的點數 | 單色器 glitch、Bragg 峰 |
@@ -387,6 +389,7 @@ GUI
 
 | 版本 | 日期 | 內容 |
 |---|---|---|
+| 1.4.0 | 2026-09-27 | CLI 端：實作 `R-EDGE-FWHM`（Gaur 2026 導數峰寬 → grid-relative 雙側 z）與 `R-NORM-COEFS`（§5.2 A Q3：pre_slope + norm_c1 + norm_c2 之 max\|z\|）；`pipeline.py` 一併持久化 `edge_fwhm_eV`、`pre_slope`、`norm_c0/1/2`；config 兩條 `enabled: true`；6 新測試（79/79 全通過）；§5.1.1 補兩列 |
 | 1.3.1 | 2026-09-27 | by Albert Sheng。§9 參考資料改為表格：加入 DOI、本專案用途、對應規則、查證狀態（由 claude.ai 規劃端合併） |
 | 1.3 | 2026-09-26 | C-CUMDIFF（Lippold 2005 判準 7 vs 8 鄰格平均）於 `rules.py` / `examine.py` 完成實作與測試（73/73 通過），config 加對應條目，§5.1.1 標記為「v1.3 起實作」 |
 | 1.2 | 2026-09-26 | by Albert Sheng。§5.1 加入 Lippold 2005、Gaur 2026、Leys 2013、Stern & Kim 1981；新增 §5.1.1 規則出處對照；R4 改為 Lippold 判準 7；新增選用規則 C-CUMDIFF；§9 參考資料 5–9；§10 新增 D8 |

@@ -1,4 +1,4 @@
-# config.yaml | version 1.1.0 by Albert Sheng
+# config.yaml | version 1.2.0 by Albert Sheng
 # NiXZ-121 examine rules & thresholds.
 # All numeric values are starting seeds, NOT literature standards.
 # Program must not hard-code thresholds elsewhere; edit this file (or use the
@@ -27,6 +27,8 @@ rules:
   R-NOISE-HF: {enabled: true,  warn_z: 3, fail_z: 5}
   R-PRE-FLAT: {enabled: true,  warn_z: 3, fail_z: 5}
   R-GLITCH:   {enabled: true,  warn_z: 3, fail_z: 5, max_count: 5}
+  R-EDGE-FWHM: {enabled: true, warn_z: 3, fail_z: 5}   # Gaur 2026 abs window 0.5-2.0 eV -> here grid-relative
+  R-NORM-COEFS: {enabled: true, warn_z: 3, fail_z: 5}  # §5.2 A Q3: pre_slope + norm_c1 + norm_c2 max-|z|
   C-SHAPE:    {enabled: true,  warn_z: 3, fail_z: 5}
   C-E0-NBR:   {enabled: true,  warn_z: 3, fail_z: 5}
   C-CUMDIFF:  {enabled: false, warn_z: 3, fail_z: 5}   # Lippold 2005 crit 7 vs 8-neighbour mean; opt-in

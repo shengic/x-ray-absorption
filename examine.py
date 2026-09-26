@@ -11,7 +11,7 @@ Outputs:
 CLI:
     python main.py --examine ROOT       (see main.py)
 
-version 1.1.0 by Albert Sheng
+version 1.2.0 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -226,6 +226,10 @@ def _compute_stats(ctx: Context) -> None:
     ctx.stats["q3_pre_flatness"] = _stats_of(q3)
     ctx.stats["q5_glitches"] = _stats_of([float(v) if v is not None else None for v in q5])
     ctx.stats["snr"] = _stats_of(snr)
+    for field_name in ("edge_fwhm_eV", "pre_slope", "norm_c1", "norm_c2"):
+        ctx.stats[field_name] = _stats_of(
+            [ctx.cells[k].meta.get(field_name) for k in ctx.gate_pass]
+        )
     ctx.stats["shape_r"] = _stats_of(list(ctx.shape_r.values()))
     ctx.stats["e0_nbr_diff"] = _stats_of(list(ctx.e0_nbr_diff.values()))
     ctx.stats["cumdiff_c7"] = _stats_of(list(ctx.cumdiff_c7.values()))

@@ -1,4 +1,4 @@
-<!-- TASK_examine_rules.md | version 1.3 by Albert Sheng | 2026-09-26 | C-CUMDIFF (Lippold 2005 criterion 7) 已由 Claude Code 實作 -->
+<!-- TASK_examine_rules.md | version 1.4 by Albert Sheng | 2026-09-27 | R-EDGE-FWHM + R-NORM-COEFS 已實作 -->
 
 # 任務：在 NiXZ-121 XANES Viewer 加入規則式「平滑／可用」判定
 
@@ -317,6 +317,9 @@ CREATE TABLE IF NOT EXISTS qc_verdict (
 | Lippold paper 閱讀 | §5.1、§5.1.1 已列引用 | 已讀 `references/*.pdf`。核心事實：cumsum(D) 放大四類典型 deviation（群點偏移、jump、斜率突變、週期彎曲），其上做 linear regression 之殘差 std 是最佳判準；作者原停止門檻 0.1 為系統特定，本專案改以穩健 z 做相對判定 | 已寫入 `rules.lippold_c7()` docstring |
 | 對比 Lippold 原設計 | 同格內留一法（subset vs 其餘平均） | 本專案用於格間（cell vs 8 鄰格平均），空間鄰域取代掃描鄰域 | 已於 rule docstring 標註「格間」延伸，並在 §5.1.1 加入來源對照 |
 | 新增測試 | §9 指定情境 | 追加 5 測試：`test_lippold_c7_zero_for_identical_spectra`、`test_lippold_c7_zero_for_pure_offset`、`test_lippold_c7_large_for_jump`、`test_c_cumdiff_disabled_by_default_in_base_config`、`test_c_cumdiff_flags_jump_when_enabled`。全套 73/73 通過 | 符合 |
+| **R-EDGE-FWHM**（v1.4） | 文件 §5.1 提到 Gaur 2026 用 FWHM 判解析度，但 §5.1.1 原無此規則 | 新增：`pipeline.edge_fwhm_eV()` 於 `E₀ ± 15 eV` 計算 dμ/dE 峰半高全寬（線性內插到 sub-pixel），一併存入 `.json` meta；`rules._r_edge_fwhm` 對 `edge_fwhm_eV` 做雙側 MAD z-score。放 `smooth` flag（測量品質，非化學一致性）；`enabled: true`（grid-relative 自校準 beamline 解析度，false-positive 風險低）。Gaur 絕對窗 0.5–2.0 eV 僅作為 config 註解 sanity | §5.1.1 已補一列（v1.4） |
+| **R-NORM-COEFS**（v1.4） | §5.2 A Q3 定義為 pre_slope、norm_c1、norm_c2 之 MAD 偏離 | 新增：`pipeline.process_section` 從 `g.pre_edge_details` 取 `pre_slope`、`norm_c0/1/2` 存入 `.json`；`rules._r_norm_coefs` 對三者分別計算 MAD z-score，取 `max(\|z\|)` 判定（雙側）。reason 標明是哪個係數 outlier。`enabled: true`。缺欄位（舊 cache）→ N/A with reason "reprocess needed" | §5.1.1 已補一列（v1.4），§5.2 A Q3 註記已由此規則實作 |
+| pipeline meta 擴充 | v1.1 meta 僅有 pre1/pre2/norm1/norm2/nnorm/nvict | v1.2 加入 pre_slope、norm_c0、norm_c1、norm_c2、edge_fwhm_eV。舊 cache 不會自動重算，規則以 N/A 處理；使用者手動 `--batch` 重跑或於 GUI 點 Reprocess | 符合「不改變第一階段既有輸出格式」 → 僅新增鍵，不刪不改既有 |
 
 ---
 
@@ -324,6 +327,7 @@ CREATE TABLE IF NOT EXISTS qc_verdict (
 
 | 版本 | 日期 | 內容 |
 |---|---|---|
+| 1.4 | 2026-09-27 | Claude Code 實作 `R-EDGE-FWHM` + `R-NORM-COEFS`（皆 `enabled: true`）；pipeline meta 加入 `edge_fwhm_eV`、`pre_slope`、`norm_c0/1/2`；6 新測試（79/79 全通過）；§12 補三列 |
 | 1.3 | 2026-09-26 | Claude Code 實作 C-CUMDIFF：`rules.lippold_c7()` helper + rule；`examine._compute_cumdiff`；config 加條目；5 新測試（73/73 全通過）；§12 完整填寫，含 Lippold 原文閱讀重點 |
 | 1.2 | 2026-09-26 | by Albert Sheng。新增選用規則 C-CUMDIFF 與共用函式 `lippold_c7`（Lippold et al. 2005 判準 7）；預留規則 T-OUTLIER-SCAN／T-UPDOWN／T-DRIFT 的既定設計；config 與測試對應更新；對齊 NiXZ-121_project.md v1.2 |
 | 1.0.0 | 2026-09-26 | 初版：規則架構、8 條初版規則、config.yaml、GUI 修改、MySQL schema、測試與驗收 |
