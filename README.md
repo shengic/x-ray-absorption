@@ -1,96 +1,90 @@
-<!-- version 1.1 by Albert Sheng -->
+<!-- README.md | version 2.0 by Albert Sheng -->
 
 # NiXZ-121 XANES Analyzer
 
-Quality-assessment tool for the **NiXZ-121** X-ray absorption dataset — an
-11 × 11 grid (121 sections) of XANES scans of a Ni sample collected in
-QEXAFS mode.
-
-Pipeline: raw `.txt` → [`larch.xafs.pre_edge()`](https://xraypy.github.io/xraylarch/xafs_preedge.html)
-→ 6 quality metrics → cached arrays + PNG plots → Tk GUI browser + 11 × 11 heatmap.
+Quality assessment for **NiXZ-121** — an 11 × 11 grid of QEXAFS scans of a
+Ni sample (121 sections total). Pipeline: raw `.txt` →
+[`larch.xafs.pre_edge()`](https://xraypy.github.io/xraylarch/xafs_preedge.html)
+→ 6 quality metrics → 9 rule-based verdicts → Tk GUI + heatmaps.
 
 ---
 
 ## Features
 
-- **Batch pipeline** — parses JAQ QEXAFS text files, runs `pre_edge()`,
-  computes Q1–Q6 (edge step, high-freq noise, pre-edge flatness, E₀ shift vs
-  `mu_ref`, glitch count, white-line height), and caches everything.
-- **Examine (rule-based)** — 9 configurable rules produce two flags per cell:
-  `smooth` (measurement quality) and `consistent` (agreement with the rest
-  of the grid). Rules are individually toggleable via a GUI panel or
-  `config.yaml`; per-cell verdict + `usable` tag written to
-  `data/**/*.examine.json`. `usable = GATE-EDGE PASS AND smooth in {PASS, WARN}`.
-  Includes `C-CUMDIFF` (opt-in) implementing Lippold 2005 criterion 7 —
-  standard-deviation-of-cumulative-difference against the 8-neighbour mean;
-  see `references/` and `TASK_examine_rules.md` §12 for the paper reading.
-- **Tkinter GUI** — three-panel browser (Z folders → X sections → info),
-  light-blue progress bar during batch runs, **singleton** plot windows
-  (Pre-edge / Normalized / Combined; each refreshes in place instead of
-  stacking), Examine + Rules toggle panel, 11 × 11 heatmap with combobox
-  coloring (raw metrics or examine flags), click-to-select a cell, and an
-  Exit button.
-- **Cache** — per-section `.npz` (arrays) + `.json` (scalar metrics) +
-  `.examine.json` (rule verdicts) under `data/`; PNG plots under `image/`.
-  Layout is 1-to-1 with the MySQL schema planned in `NiXZ-121.md` §6
-  (MySQL wiring deferred until schema is finalized).
-- **Tests** — 73 pytest tests covering regex/naming, discovery, data format,
-  pipeline round-trip, metric shapes, cache I/O, GUI smoke, and the examine
-  engine (rules, N/A propagation, config hash, flag combine, lippold_c7
-  identities, C-CUMDIFF jump detection).
+- **Phase 1 pipeline** (`pipeline.py`) — parses JAQ QEXAFS text, runs
+  `pre_edge()`, computes Q1–Q6 (edge step, HF noise, pre-edge flatness,
+  E₀ shift vs `mu_ref`, glitch count, white-line height), caches arrays +
+  metrics + PNG plots.
+- **Phase 2 examine** (`rules.py`, `examine.py`) — 9 configurable rules
+  produce two flags per cell:
+  - `smooth` — measurement quality (`R-SNR`, `R-NOISE-HF`, `R-PRE-FLAT`, `R-GLITCH`)
+  - `consistent` — grid-wide agreement (`C-SHAPE`, `C-E0-NBR`, `C-CUMDIFF`)
+  - plus gates `GATE-EDGE`, `CAL-EREF`
+  - `usable = GATE-EDGE PASS AND smooth in {PASS, WARN}`
+  - `C-CUMDIFF` implements Lippold 2005 criterion 7 (std of residual of
+    cumulative-difference after linear-fit) against the 8-neighbour mean;
+    opt-in via config.
+- **Tk GUI** — three-panel browser (Z folders → X sections → info),
+  light-blue batch progress bar, singleton plot windows (Pre-edge /
+  Normalized / Combined; reused per kind, never stacked), 11 × 11 heatmap
+  with combobox coloring by raw metrics or examine flags, small-multiples
+  Rule Violations window (one 11 × 11 per rule), click-to-select on all
+  heatmaps, Rules toggle panel with editable thresholds + optional
+  Save-to-yaml, Exit.
+- **File cache** — `data/**/*.npz` (arrays), `data/**/*.json` (metrics),
+  `data/**/*.examine.json` (rule verdict), `data/examine_run.json` (run
+  manifest with `config_hash`), `image/**/*.png` (plots). 1-to-1 map onto
+  the MySQL schema in `NiXZ-121_project.md` §6 — MySQL wiring deferred
+  until the schema is finalized.
+- **Tests** — 73 pytest tests covering regex/naming, discovery, data
+  format, pipeline round-trip, metric shapes, cache I/O, GUI smoke,
+  examine engine (rules, N/A propagation, config-hash determinism,
+  flag combine, lippold_c7 identities, C-CUMDIFF jump detection).
 
 ## Install
 
-Python 3.11+ on Windows/macOS/Linux.
+Python 3.11+ (Windows / macOS / Linux).
 
 ```
 python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
 ```
 
-xraylarch pulls in a large dependency tree (scipy, lmfit, pymatgen, silx,
-h5py, sqlalchemy, plotly, mkl, ...). First install takes several minutes.
+xraylarch pulls a heavy dependency tree (scipy, lmfit, pymatgen, silx,
+h5py, sqlalchemy, plotly, mkl); first install takes several minutes.
 
 ## Run
 
-GUI (default):
+**GUI** — the default:
 
 ```
 python main.py
 ```
 
-On launch you'll be prompted for the dataset root — a folder containing
-`Z{i}_{z}/X{j}_{x}_{start}_{end}_XANES.txt` files. Then:
+On launch, pick the dataset root (folder containing
+`Z{i}_{z}/X{j}_{x}_{start}_{end}_XANES.txt`). Then:
 
-- Click a **Z folder** → middle panel lists that folder's X sections
-- **Single-click** an X section → runs pipeline (or loads cache), shows E₀
-  and Q1–Q6 in the info panel
-- **Double-click** an X section → opens Pre-edge + Normalized plot windows
-- **Both plots (combined)** button → one window with both panels side-by-side
-- **Process all (batch)** → runs the whole tree, progress bar advances
-- **11 × 11 heatmap** → colored by Q1 (edge step); white cells = unprocessed
+| gesture | action |
+|---|---|
+| click a Z folder | list its X sections in the middle panel |
+| single-click an X section | process (or load cache), show metrics only |
+| double-click an X section | also open Pre-edge + Normalized plot windows |
+| **Both plots (combined)** button | open the side-by-side combined figure |
+| **Process all (batch)** | run pipeline on all 121, progress bar fills |
+| **Examine 121** | rule-based verdict over all cached cells |
+| **Rules...** | toggle rules, edit z-score thresholds, Apply & Examine |
+| **11 × 11 heatmap** | color by raw metric or examine flag (PASS/WARN/FAIL/N/A) |
+| **Rule violations** | small-multiples: one 11 × 11 per rule |
+| click any heatmap cell | jump-select the section in the listboxes |
 
-Batch (headless, no GUI):
+**Headless (batch + examine, no GUI)**:
 
 ```
-python main.py --batch image_AI_Ni                    # pipeline only
-python main.py --examine image_AI_Ni                  # rule-based examine (needs cache)
-python main.py --batch image_AI_Ni --examine image_AI_Ni  # both
+python main.py --batch image_AI_Ni                                   # pipeline only
+python main.py --examine image_AI_Ni                                 # rule verdict on cached cells
+python main.py --batch image_AI_Ni --examine image_AI_Ni             # both in one run
+python main.py --examine image_AI_Ni --config alt.yaml               # custom config
 ```
-
-## Rule-based examine
-
-`config.yaml` at the repo root defines the 8 rules and their thresholds.
-In the GUI, `Rules...` opens a toggle panel — check/uncheck each rule,
-edit its z-score thresholds, and hit **Apply & Examine**. The heatmap can
-color by any raw metric or by the resulting flag (green / yellow / red /
-grey) — pick from the combobox above the heatmap.
-
-Rule dependencies (`requires`) are enforced: disabling `CAL-EREF` propagates
-N/A to `C-SHAPE` and `C-E0-NBR` (with reason `"requires CAL-EREF (disabled)"`).
-Disabling all `smooth` rules yields `smooth: N/A` and `usable: NO`.
-
-## Storage layout
 
 ## Tests
 
@@ -98,17 +92,17 @@ Disabling all `smooth` rules yields `smooth: N/A` and `usable: NO`.
 python -m pytest test/
 ```
 
-See [`test/README.md`](test/README.md) for a per-file breakdown.
+See `test/README.md` for what each file covers.
 
 ## Storage layout
 
 ```
 data/
-  examine_run.json               run manifest (uuid, config, config_hash, stats)
+  examine_run.json                  run manifest: uuid, config, config_hash, per-field stats
   Z0_-5/
-    X0_5_1_120.npz               energy, mu, mu_ref, pre_edge, post_edge, norm, flat, e0, edge_step
-    X0_5_1_120.json              pipeline metadata + Q1-Q6
-    X0_5_1_120.examine.json      per-cell verdict: smooth, consistent, usable, per-rule level/value/reason
+    X0_5_1_120.npz                  energy, mu, mu_ref, pre_edge, post_edge, norm, flat, e0, edge_step (float32)
+    X0_5_1_120.json                 pipeline metadata + Q1-Q6 + preliminary usable
+    X0_5_1_120.examine.json         rule verdict: smooth, consistent, usable, per-rule {level,value,reason}
     ...
 image/
   Z0_-5/
@@ -117,32 +111,90 @@ image/
     ...
 ```
 
-Filename stem: `X{j}_{x}_{start}_{end}` (mirrors source). Folder disambiguates Z.
+Filename stem `X{j}_{x}_{start}_{end}` mirrors the source; folder disambiguates Z.
 
 ## Project docs
 
-- [`NiXZ-121_project.md`](NiXZ-121_project.md) — **authoritative** project
-  reference (v1.3+): includes §5.1 literature review with Lippold 2005 /
-  Gaur 2026 / TXM-Wizard citations, §5.1.1 rule-provenance table, §10
-  discrepancy log (D1–D8), and the MySQL schema decision.
-- [`NiXZ-121.md`](NiXZ-121.md) — earlier consolidated summary; kept for
-  history. New details go into `NiXZ-121_project.md`.
-- [`HANDOFF.md`](HANDOFF.md) — architectural handoff for AI agents or new
-  contributors; explains code structure, invariants, and next steps.
-- [`TASK_examine_rules.md`](TASK_examine_rules.md) — Phase 2 examine spec;
-  §12 records implementation deviations from the original assumption doc.
-- [`test/README.md`](test/README.md) — test suite guide.
-
-## Roadmap
-
-Items still open (from `NiXZ-121.md` §8):
-
-1. Full 121-file dataset (currently 3 of 11 Z folders present)
-2. MAD-based threshold auto-tuning across all 121 sections
-3. `mu_ref` calibration reference confirmation (Ni foil?)
-4. Image-side ROI & Q7 (Laplacian variance, greyscale uniformity)
-5. MySQL schema implementation (schema in `NiXZ-121.md` §6.1)
+- **`NiXZ-121_project.md`** — authoritative technical reference (data
+  format, naming rules, 11 × 11 matrix, pipeline steps, metric
+  definitions, §5.1 literature review with citations to xraylarch, MBACK,
+  TXM-Wizard, Lippold 2005, Gaur 2026, Leys 2013, Stern & Kim 1981;
+  §5.1.1 rule-provenance table; §6 MySQL schema; §10 discrepancy log
+  D1–D8).
+- **`TASK_examine_rules.md`** — Phase 2 spec + §12 implementation log
+  (assumed vs actual key names, unit choices, Lippold paper reading,
+  MySQL deferral, C-CUMDIFF status).
+- **`test/README.md`** — per-file test-suite guide.
 
 ---
 
-version 1.1 by Albert Sheng
+## For contributors and AI agents
+
+### Repository layout
+
+```
+main.py                tkinter GUI + --batch / --examine CLI
+pipeline.py            Phase 1: parse, pre_edge, metrics, cache I/O, figure builders
+rules.py               Phase 2: Rule dataclass + REGISTRY + 9 rules + lippold_c7 helper
+examine.py             Phase 2: context builder + topological execution + verdict writer
+config.yaml            rules + thresholds + edge config + (disabled) db config
+requirements.txt       numpy, matplotlib, xraylarch, pyyaml, pytest
+test/                  73-test pytest suite
+```
+
+### Sharp edges (bugs I hit or foresee)
+
+1. **Windows glob is case-insensitive** — `Z6_1/x5_0_666_786_XANES.txt`
+   (lowercase `x`) was included by `glob("X*_XANES.txt")` and crashed the
+   sort. `pipeline.discover_x_files` now strictly filters by `FNAME_RE`
+   so malformed names drop silently. Rename lowercase files to uppercase
+   to recover the 121st section.
+2. **`g.pre1` doesn't exist** — larch stores those parameters under
+   `g.pre_edge_details.pre1` (and `.pre2, .norm1, .norm2, .nnorm, .nvict`).
+3. **E₀ garbage on empty regions** — corner sections with no Ni signal
+   have `edge_step ≈ 0.05` and `find_e0` picks something like 8629 eV
+   instead of ~8333. Baseline stats in examine.py exclude non-`GATE-EDGE`
+   cells for this reason; sanity-check `edge_step > 0.05` before trusting `e0`.
+4. **Progress bar color needs `clam` theme** — Windows vista theme silently
+   ignores `background` on `ttk.Progressbar`; `main.py` switches to `clam`
+   globally so the `Blue.Horizontal.TProgressbar` style takes effect.
+5. **Plot windows are singletons keyed by kind** — `self.plot_windows` is
+   `dict[str, Toplevel]`; do not `.pack()` into an existing Toplevel
+   without destroying its children first. `_open_plot` handles this.
+6. **`matplotlib.figure.Figure` is used directly** (no `pyplot`) so figures
+   work identically for `savefig()` and for `FigureCanvasTkAgg`. Don't
+   switch to pyplot.
+7. **MAD = 0 → N/A** — if the whole 121-grid is unrealistically uniform,
+   robust MAD-scaled z can be 0 and every rule returns N/A. Real data has
+   jitter; tests seed jitter explicitly to avoid this false-negative.
+8. **N/A does NOT count as PASS** — if a required rule is disabled or
+   non-PASS, downstream rules return N/A with reason
+   `"requires X (disabled)"` or `"requires X (FAIL)"`. Baseline stats
+   (median/MAD) use only cells that passed `GATE-EDGE`.
+
+### Adding a new rule
+
+1. Add a function decorated with
+   `@rl.rule(id, flag, scope, requires=(...))` in `rules.py`, returning
+   `RuleResult(level, value, reason)`.
+2. Add its default settings under `rules:` in `config.yaml`.
+
+Nothing in `examine.py` needs to change — topological sort picks it up.
+
+### Deferred work
+
+Recorded in `NiXZ-121_project.md` §8:
+1. Full 121-file dataset (currently 3 Z folders present: Z0_-5, Z6_1, Z10_5)
+2. MAD-based threshold auto-tuning across the full grid
+3. `mu_ref` calibration reference confirmation (Ni foil?)
+4. Q7 (image indicator) — needs the `.bin` per-scan data
+5. MySQL wiring — schema in `NiXZ-121_project.md` §6; `.npz` + `.json` +
+   `.examine.json` map 1-to-1 onto `spectra`, `qc`, `qc_rule_result`,
+   `qc_verdict`
+6. Reserved rules `T-DRIFT`, `T-UPDOWN`, `T-OUTLIER-SCAN`, `T-SATURATION`
+   — will reuse `rules.lippold_c7()` once `.bin` scan-level data is
+   available
+
+---
+
+version 2.0 by Albert Sheng
