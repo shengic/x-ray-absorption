@@ -215,8 +215,9 @@ Files:
 
 Added on top of the Phase 1 pipeline without altering its outputs.
 
-**Files**: `rules.py` (Rule dataclass + REGISTRY + 8 rules), `examine.py`
-(Context builder + topological execution + verdict writer), `config.yaml`.
+**Files**: `rules.py` (Rule dataclass + REGISTRY + 9 rules + `lippold_c7`
+helper), `examine.py` (Context builder + topological execution + verdict
+writer), `config.yaml`.
 
 **Flag semantics**:
 - `smooth` — measurement quality (Q2, Q3, Q5, SNR)
@@ -260,6 +261,17 @@ python main.py --batch ROOT              # Phase 1 only
 python main.py --examine ROOT            # Phase 2 only (needs cache)
 python main.py --batch ROOT --examine ROOT   # both
 ```
+
+**Rules currently implemented**: `GATE-EDGE` (edge_step bounds), `CAL-EREF`
+(mu_ref window + spread), `R-SNR`, `R-NOISE-HF`, `R-PRE-FLAT`, `R-GLITCH`,
+`C-SHAPE` (R-factor vs cross-cell median), `C-E0-NBR` (corrected E₀ vs
+8-neighbour median), and **`C-CUMDIFF`** — Lippold 2005 criterion 7
+(std of residual of `A(j) = Σ(spec − ref)` after a linear-fit) applied vs
+the mean of 8-neighbour interpolated norms on the common energy grid.
+`C-CUMDIFF` is `enabled: false` by default; enable via the Rules panel to
+opt in. The shared `rules.lippold_c7(spec, ref)` helper is deliberately
+placed in `rules.py` so reserved rules `T-OUTLIER-SCAN` / `T-UPDOWN` /
+`T-DRIFT` can reuse it once `.bin` per-scan data becomes available.
 
 **Adding a new rule** (the whole point of Phase 2):
 1. Add a `@rl.rule(id, flag, scope, requires=(...))` function in `rules.py`

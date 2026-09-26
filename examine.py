@@ -11,7 +11,7 @@ Outputs:
 CLI:
     python main.py --examine ROOT       (see main.py)
 
-version 1.0.0 by Albert Sheng
+version 1.1.0 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -77,6 +77,8 @@ class Context:
     n_med: np.ndarray | None = None
     common_energy: np.ndarray | None = None
     e0_nbr_diff: dict[tuple[int, int], float] = field(default_factory=dict)
+    interpolated: dict[tuple[int, int], np.ndarray] = field(default_factory=dict)
+    cumdiff_c7: dict[tuple[int, int], float] = field(default_factory=dict)
 
 
 # ---------- helpers ----------
@@ -154,7 +156,6 @@ def _compute_shape_context(ctx: Context, cal_pass: set[tuple[int, int]]) -> None
     grid = np.arange(e0_med + lo, e0_med + hi + step * 0.5, step, dtype=float)
     ctx.common_energy = grid
 
-    interpolated: dict[tuple[int, int], np.ndarray] = {}
     for k in cal_pass:
         cell = ctx.cells[k]
         b = cell.bundle()
@@ -164,15 +165,32 @@ def _compute_shape_context(ctx: Context, cal_pass: set[tuple[int, int]]) -> None
         norm = np.asarray(b["norm"], dtype=float)
         if e[0] > grid[0] or e[-1] < grid[-1]:
             continue                                           # doesn't cover
-        interpolated[k] = np.interp(grid, e, norm)
-    if not interpolated:
+        ctx.interpolated[k] = np.interp(grid, e, norm)
+    if not ctx.interpolated:
         return
-    stack = np.vstack(list(interpolated.values()))
+    stack = np.vstack(list(ctx.interpolated.values()))
     n_med = np.median(stack, axis=0)
     ctx.n_med = n_med
     denom = float(np.sum(n_med ** 2)) or 1.0
-    for k, n in interpolated.items():
+    for k, n in ctx.interpolated.items():
         ctx.shape_r[k] = float(np.sum((n - n_med) ** 2) / denom)
+
+
+def _compute_cumdiff(ctx: Context) -> None:
+    """Per-cell Lippold 2005 criterion 7 against the mean of 8-neighbour
+    corrected norms on the common energy grid."""
+    if not ctx.interpolated:
+        return
+    for k, spec in ctx.interpolated.items():
+        i, j = k
+        nbrs = [ctx.interpolated[(i + di, j + dj)]
+                for di in (-1, 0, 1) for dj in (-1, 0, 1)
+                if not (di == 0 and dj == 0)
+                and (i + di, j + dj) in ctx.interpolated]
+        if len(nbrs) < 2:
+            continue
+        ref = np.mean(nbrs, axis=0)
+        ctx.cumdiff_c7[k] = rl.lippold_c7(spec, ref)
 
 
 def _compute_e0_nbr(ctx: Context, cal_pass: set[tuple[int, int]]) -> None:
@@ -210,6 +228,7 @@ def _compute_stats(ctx: Context) -> None:
     ctx.stats["snr"] = _stats_of(snr)
     ctx.stats["shape_r"] = _stats_of(list(ctx.shape_r.values()))
     ctx.stats["e0_nbr_diff"] = _stats_of(list(ctx.e0_nbr_diff.values()))
+    ctx.stats["cumdiff_c7"] = _stats_of(list(ctx.cumdiff_c7.values()))
 
 
 # ---------- main entry ----------
@@ -276,6 +295,7 @@ def run_examine(dataset_root: Path, config: dict,
 
     # 3. Precompute grid stats
     _compute_shape_context(ctx, cal_pass)
+    _compute_cumdiff(ctx)
     _compute_e0_nbr(ctx, cal_pass)
     _compute_stats(ctx)
 

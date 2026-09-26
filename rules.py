@@ -6,7 +6,7 @@ and returns RuleResult(level, value, reason).
 
 Levels: PASS(0), WARN(1), FAIL(2), None = N/A.
 
-version 1.0.0 by Albert Sheng
+version 1.1.0 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -49,6 +49,27 @@ def rule(id: str, flag: str, scope: str, requires: tuple[str, ...] = ()):
 
 
 # ---------- helpers ----------
+
+def lippold_c7(spec: np.ndarray, ref: np.ndarray) -> float:
+    """Lippold et al. (J. Synchrotron Rad. 12, 45-52, 2005) criterion 7:
+    standard deviation of the residual of the cumulative-difference spectrum
+    A(j) = Σ_{i≤j}(spec − ref) after a linear regression fit.
+
+    A(j) is a flat line only when spec and ref differ by pure random noise;
+    systematic deviations (group shifts, jump discontinuities, slope changes,
+    periodic bending — see Lippold Fig. 1b-e) blow up under cumulative
+    summation, then the residual after linear detrend quantifies them.
+
+    Inputs must be on the same (energy-corrected) grid. Values are only
+    meaningful for relative comparison within one Examine run — the paper's
+    absolute stopping threshold (~0.1) is system-specific and does not
+    transfer to other datasets.
+    """
+    a = np.cumsum(np.asarray(spec, dtype=float) - np.asarray(ref, dtype=float))
+    x = np.arange(a.size)
+    p = np.polyfit(x, a, 1)
+    return float(np.std(a - np.polyval(p, x), ddof=2))
+
 
 def _robust_z(v: float, median: float, mad_scaled: float) -> float | None:
     """z = (v - median) / (1.4826 * MAD). Returns None if MAD == 0."""
@@ -195,6 +216,20 @@ def _c_e0_nbr(ctx, cell, params) -> RuleResult:
     if d is None:
         return RuleResult(None, None, "<2 valid neighbors")
     return _two_sided_z(d, ctx.stats.get("e0_nbr_diff"), params, "n/a")
+
+
+@rule("C-CUMDIFF", flag="consistent", scope="grid",
+      requires=("GATE-EDGE", "CAL-EREF"))
+def _c_cumdiff(ctx, cell, params) -> RuleResult:
+    """Lippold 2005 criterion 7 applied vs the mean of 8-neighbour corrected
+    norms on the common energy grid. Requires the shape context (interpolated
+    norms) — cells that could not be interpolated onto the common grid, or
+    have fewer than 2 valid neighbours there, return N/A."""
+    v = ctx.cumdiff_c7.get(cell.key)
+    if v is None:
+        return RuleResult(None, None,
+                          "<2 neighbours on common grid or interp missing")
+    return _upper_z(v, ctx.stats.get("cumdiff_c7"), params, "n/a")
 
 
 # ---------- Combine ----------

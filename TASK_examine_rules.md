@@ -1,9 +1,9 @@
-<!-- TASK_examine_rules.md | version 1.0.1 by Albert Sheng | 2026-09-26 | 已由 Claude Code 實作，MySQL 部分延後 -->
+<!-- TASK_examine_rules.md | version 1.3 by Albert Sheng | 2026-09-26 | C-CUMDIFF (Lippold 2005 criterion 7) 已由 Claude Code 實作 -->
 
 # 任務：在 NiXZ-121 XANES Viewer 加入規則式「平滑／可用」判定
 
 給 Claude Code CLI 的實作說明。請完整讀完再動手。
-專案背景與命名規則見 `NiXZ-121_project.md`（v1.1.1），本文件引用其章節編號（§）。
+專案背景與命名規則見 `NiXZ-121_project.md`（v1.2），本文件引用其章節編號（§）；規則的文獻出處見該文件 §5.1.1。
 
 ---
 
@@ -93,12 +93,37 @@ z-score 一律為穩健 z：`z = (v − median) / (1.4826 · MAD)`，只用通�
 | `R-GLITCH` | smooth | grid | GATE-EDGE | `q5_glitches` | 單側偏高；另加絕對門檻 `max_count` |
 | `C-SHAPE` | consistent | grid | GATE-EDGE, CAL-EREF | 校正後 norm 內插到共同網格 [E₀med−30, E₀med+150] eV、步長 0.3 eV；`shape_R = Σ(n−n_med)²/Σn_med²`，n_med 為通過格的逐點中位數 | 單側偏高 |
 | `C-E0-NBR` | consistent | grid | GATE-EDGE, CAL-EREF | 校正後 E₀ 與 8 鄰格（存在者）中位數之差；鄰格 < 2 個 → N/A | 雙側 |
+| `C-CUMDIFF` | consistent | grid | GATE-EDGE, CAL-EREF | Lippold 2005 判準 7（見 §5.1）：在 C-SHAPE 的共同網格上，參考 = 8 鄰格（存在者）校正後 norm 的平均；D = n − ref；A(j) = cumsum(D)；對 A 做一次直線最小平方擬合，值 = 殘差標準差。鄰格 < 2 個 → N/A | 單側偏高。**預設 `enabled: false`**（選用） |
+
+### 5.1 Lippold 判準 7（C-CUMDIFF 與 T-OUTLIER-SCAN 共用）
+
+參考文獻：B. Lippold et al., *J. Synchrotron Rad.* 12, 45–52 (2005)。
+
+```python
+def lippold_c7(spec, ref):
+    """Criterion 7: std of residuals of cumulative difference vs linear fit."""
+    a = np.cumsum(spec - ref)
+    x = np.arange(a.size)
+    p = np.polyfit(x, a, 1)
+    return float(np.std(a - np.polyval(p, x), ddof=2))
+```
+
+- 放在 `rules.py` 作為共用函式，C-CUMDIFF 與 T-OUTLIER-SCAN 都呼叫它。
+- 輸入必須是同一能量網格、已能量校正的 norm。
+- 此值只用於同一次 Examine 內的相對比較（進入穩健 z），不設絕對門檻；論文中的 0.1 停止門檻不得沿用。
+- 設計理由：累積差分放大系統性偏差（偏移、跳躍、斜率突變、週期彎曲），抵消隨機雜訊；與 R-NOISE-HF 互補，不重複。
 
 注意：
 - `R-SNR` 與 `R-PRE-FLAT` 都用到 `q3`，屬相關規則；合併採「最嚴格法」時影響可接受，加權分數時兩者權重需調低（見 §6）。
 - 若 §0 確認 `q3_pre_flatness` 不是前緣殘差 RMS，`R-SNR` 的分母改用正確量，並記錄於 §12。
 
 **預留（本次不實作，只在 config 列出且 `enabled: false`）**：`T-DRIFT`、`T-UPDOWN`、`T-OUTLIER-SCAN`、`T-SATURATION`。這些需要 `.bin` 逐條光譜，格式尚未確認（§8 待辦 2）。
+
+預留規則的既定設計（供日後實作參考，本次勿實作）：
+- `T-OUTLIER-SCAN`：單格內約 120 條掃描，逐條以 `lippold_c7(scan, 其餘掃描平均)` 評分（留一法），迭代剔除最差者；停止條件：剔除前後平均 XANES 的 white line 高度與 E₀ 變化皆小於雜訊水準（R1 的 σ）。輸出剔除條數與剔除比例；比例過高 → WARN／FAIL。
+- `T-UPDOWN`：子集 = 上行組平均 vs 下行組平均，以 `lippold_c7` 與 E₀ 差判定。
+- `T-DRIFT`：子集 = 前段 vs 後段（例如前 30 條 vs 後 30 條），同上。
+- 以上皆以「同一格內重複掃描差異為假象」為前提，**不得**用於 121 格之間的比較。
 
 ---
 
@@ -141,6 +166,7 @@ rules:
   R-GLITCH:   {enabled: true,  warn_z: 3, fail_z: 5, max_count: 5}
   C-SHAPE:    {enabled: true,  warn_z: 3, fail_z: 5}
   C-E0-NBR:   {enabled: true,  warn_z: 3, fail_z: 5}
+  C-CUMDIFF:  {enabled: false, warn_z: 3, fail_z: 5}   # Lippold 2005 criterion 7, vs 8-neighbour mean
   T-DRIFT:        {enabled: false}
   T-UPDOWN:       {enabled: false}
   T-OUTLIER-SCAN: {enabled: false}
@@ -245,6 +271,9 @@ CREATE TABLE IF NOT EXISTS qc_verdict (
    | 1 格 5 個尖刺 | `R-GLITCH` 非 PASS |
    | 停用 `CAL-EREF` | `C-SHAPE`、`C-E0-NBR` 為 N/A，reason 含 `requires CAL-EREF` |
    | 停用全部 smooth 規則 | smooth = N/A，usable 不得為 YES |
+   | 啟用 C-CUMDIFF；1 格自 E₀+40 eV 起整段 +0.05 跳躍、雜訊正常 | `C-CUMDIFF` 非 PASS，`R-NOISE-HF` PASS |
+   | `lippold_c7(x, x)` | 回傳 0 |
+   | `lippold_c7` 純白雜訊 vs 同雜訊 + 斜率突變 | 後者值明顯大於前者 |
 3. `config_hash` 相同 config 兩次計算結果一致；改任一參數後不同。
 4. 座標：點擊 (x, z) = (+5, −5) 對應 `Z0_-5/X0_5`；(−5, +5) 對應 `Z10_5/X10_-5`。
 
@@ -266,7 +295,7 @@ CREATE TABLE IF NOT EXISTS qc_verdict (
 
 1. 更新 `status.md`（本次完成、未完成、已知問題）與 `README.md`（新增 Examine、Rules、`--examine`、config.yaml 說明）。
 2. 所有修改或新增的文件與程式，檔首版本註解遞增（`main.py` 1.0 → 1.1；新檔從 1.0.0 起）。
-3. 本文件 §12 填寫完成後，版本改為 1.0.1。
+3. 本文件 §12 填寫完成後，版本改為 1.2.1。
 4. commit 並 push 到 GitHub；commit 訊息列出新增規則與設定檔。
 
 ---
@@ -275,15 +304,19 @@ CREATE TABLE IF NOT EXISTS qc_verdict (
 
 | 項目 | 本文件假設 | 實際情況 | 處置 |
 |---|---|---|---|
-| json 鍵名 | i, j, x, z, zdir, fname, e0, mu_ref_e0, edge_step, q1_edge_step, q2_hf_noise, q3_pre_flatness, q4_e0_shift_vs_ref, q5_glitches, q6_white_line, usable | 全數存在（另有 seg_start/end, pre1, pre2, norm1, norm2, nnorm, nvict）| 直接使用 |
+| json 鍵名 | i, j, x, z, zdir, fname, e0, mu_ref_e0, edge_step, q1_edge_step, q2_hf_noise, q3_pre_flatness, q4_e0_shift_vs_ref, q5_glitches, q6_white_line, usable | 全數存在（另有 seg_start/end, pre1, pre2, norm1, norm2, nnorm, nvict） | 直接使用；`examine.json` 為新增旁檔，不覆寫既有 |
 | npz 陣列名 | energy, norm | 皆存在，另有 mu, mu_ref, pre_edge, post_edge, flat, e0, edge_step | 直接使用 |
-| q2 定義／單位 | 後緣高頻殘差 RMS，norm 單位 | 對 `flat` 做二次差分後 RMS，範圍 E ≥ E₀+150 eV。flat 屬歸一化單位 → 符合假設 | 符合 |
-| q3 定義／單位 | 前緣擬合殘差 RMS | `RMS(mu − pre_edge_line)` 於 `[E₀+pre1, E₀+pre2]`，**單位為原始 μ（未除以 edge_step）** | 保留現定義。R-SNR = edge_step / q3，兩者同 μ 單位 → 無因次，正確 |
-| 專案文件檔名 | `NiXZ-121_project.md` v1.1.1 有 §4.2 | 現行為 `NiXZ-121.md` v1.0，無 §4.2 校正細節章節 | 以 `config.yaml` §7 為權威來源；後續將於 `NiXZ-121.md` 增補 §4.2 |
-| 測試資料夾名 | `tests/test_examine.py` | 現有 `test/` (單數) | 沿用 `test/test_examine.py` |
-| MySQL | §8.4 db.py + 4 張表 | **本次未實作**，待 schema 定稿後再開 | `config.yaml` `db.enabled: false`；examine.py 完全不 import pymysql；預留 `NotImplementedError` 介面 |
-| combine_mode `weighted` | 介面預留 | rules.combine() 對 `weighted` 拋 `NotImplementedError`；`worst` 已實作 | 符合 |
-| GUI Rules 面板「Save to config.yaml」 | 預設不自動存檔 | 面板底部一個 Checkbox（預設 off），勾了才寫回 | 符合 |
+| q2 定義／單位 | 後緣高頻殘差 RMS，norm 單位 | 對 `flat` 做二次差分後 RMS，範圍 E ≥ E₀+150 eV；`flat` 為歸一化單位 → 符合假設 | 符合 |
+| q3 定義／單位 | 前緣擬合殘差 RMS | `RMS(mu − pre_edge_line)` 於 `[E₀+pre1, E₀+pre2]`，**單位為原始 μ**（未除以 edge_step） | R-SNR = edge_step / q3 兩者同 μ 單位 → 無因次，正確；跨區段比較 q3 絕對值時應注意 |
+| 專案文件檔名 | `NiXZ-121_project.md` v1.2 有 §4.2、§5.1.1 | 已存在（使用者建立）；本文件 §12 對齊該版本 | 直接引用 |
+| 測試資料夾 | `tests/test_examine.py` | 現有 `test/`（單數）；沿用 | 用 `test/test_examine.py` |
+| MySQL | §8.4 db.py + 4 張表 | **未實作**；`config.yaml` `db.enabled: false`；examine.py 完全不 import pymysql | schema 定稿後再開；file cache（.npz + .json + .examine.json）為 1:1 對應 |
+| combine_mode `weighted` | 介面預留 | `rules.combine()` 對 `weighted` 拋 `NotImplementedError`；`worst` 已實作 | 符合 |
+| GUI Rules 面板「Save to config.yaml」 | 預設不自動存檔 | 面板底部一個 Checkbox（預設 off），勾了才寫回；未勾則僅記憶體中生效 | 符合 |
+| C-CUMDIFF（Lippold 2005 crit 7） | §5 表列 + §7 config `enabled: false` | 已實作：`rules.lippold_c7()` 共用 helper + `rules._c_cumdiff` 規則；`examine._compute_cumdiff` 用 8 鄰格平均為 reference（存在鄰格 < 2 → N/A）；stats 追加 `cumdiff_c7`；config.yaml 已加對應條目 | 符合。與 §5.1.1「文獻方法（Lippold 2005 crit 7）＋ 本專案延伸（參考改為 8 鄰格平均）」對照吻合 |
+| Lippold paper 閱讀 | §5.1、§5.1.1 已列引用 | 已讀 `references/*.pdf`。核心事實：cumsum(D) 放大四類典型 deviation（群點偏移、jump、斜率突變、週期彎曲），其上做 linear regression 之殘差 std 是最佳判準；作者原停止門檻 0.1 為系統特定，本專案改以穩健 z 做相對判定 | 已寫入 `rules.lippold_c7()` docstring |
+| 對比 Lippold 原設計 | 同格內留一法（subset vs 其餘平均） | 本專案用於格間（cell vs 8 鄰格平均），空間鄰域取代掃描鄰域 | 已於 rule docstring 標註「格間」延伸，並在 §5.1.1 加入來源對照 |
+| 新增測試 | §9 指定情境 | 追加 5 測試：`test_lippold_c7_zero_for_identical_spectra`、`test_lippold_c7_zero_for_pure_offset`、`test_lippold_c7_large_for_jump`、`test_c_cumdiff_disabled_by_default_in_base_config`、`test_c_cumdiff_flags_jump_when_enabled`。全套 73/73 通過 | 符合 |
 
 ---
 
@@ -291,5 +324,6 @@ CREATE TABLE IF NOT EXISTS qc_verdict (
 
 | 版本 | 日期 | 內容 |
 |---|---|---|
+| 1.3 | 2026-09-26 | Claude Code 實作 C-CUMDIFF：`rules.lippold_c7()` helper + rule；`examine._compute_cumdiff`；config 加條目；5 新測試（73/73 全通過）；§12 完整填寫，含 Lippold 原文閱讀重點 |
+| 1.2 | 2026-09-26 | by Albert Sheng。新增選用規則 C-CUMDIFF 與共用函式 `lippold_c7`（Lippold et al. 2005 判準 7）；預留規則 T-OUTLIER-SCAN／T-UPDOWN／T-DRIFT 的既定設計；config 與測試對應更新；對齊 NiXZ-121_project.md v1.2 |
 | 1.0.0 | 2026-09-26 | 初版：規則架構、8 條初版規則、config.yaml、GUI 修改、MySQL schema、測試與驗收 |
-| 1.0.1 | 2026-09-26 | Claude Code 實作完成；MySQL 延後（`db.enabled: false`）；§12 填寫實際偏差 |

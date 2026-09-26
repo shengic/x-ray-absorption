@@ -163,10 +163,37 @@ def _cfg():
 
 # --------- Tests ---------
 
-def test_registry_contains_all_8_rules():
+def test_registry_contains_all_9_rules():
     for rid in ("GATE-EDGE", "CAL-EREF", "R-SNR", "R-NOISE-HF", "R-PRE-FLAT",
-                "R-GLITCH", "C-SHAPE", "C-E0-NBR"):
+                "R-GLITCH", "C-SHAPE", "C-E0-NBR", "C-CUMDIFF"):
         assert rid in rl.REGISTRY, rid
+
+
+def test_lippold_c7_zero_for_identical_spectra():
+    x = np.linspace(0, 1, 100)
+    spec = np.sin(2 * np.pi * x) + 1.0
+    assert rl.lippold_c7(spec, spec.copy()) == pytest.approx(0.0, abs=1e-9)
+
+
+def test_lippold_c7_zero_for_pure_offset():
+    """A constant offset yields A(j) = offset * j — perfectly linear, so
+    the residual std after linear detrend is 0."""
+    x = np.linspace(0, 1, 500)
+    spec = np.sin(2 * np.pi * x) + 1.0
+    ref = spec - 0.05
+    assert rl.lippold_c7(spec, ref) == pytest.approx(0.0, abs=1e-9)
+
+
+def test_lippold_c7_large_for_jump():
+    """A jump discontinuity yields A(j) with a kink → large residual std."""
+    rng = np.random.default_rng(0)
+    n = 500
+    ref = np.zeros(n) + rng.normal(0, 0.01, size=n)
+    spec = ref.copy()
+    spec[n // 2:] += 0.5                                  # jump
+    v_jump = rl.lippold_c7(spec, ref)
+    v_noise = rl.lippold_c7(ref + rng.normal(0, 0.01, size=n), ref)
+    assert v_jump > 20 * v_noise
 
 
 def test_clean_grid_all_pass(synthetic_grid):
@@ -255,6 +282,37 @@ def test_examine_persists_per_cell_and_run_json(synthetic_grid):
     assert per["run_id"] == run.run_id
     assert per["smooth"] in ("PASS", "WARN", "FAIL", "N/A")
     assert per["consistent"] in ("PASS", "WARN", "FAIL", "N/A")
+
+
+def test_c_cumdiff_disabled_by_default_in_base_config(synthetic_grid):
+    """BASE_CONFIG does not enable C-CUMDIFF (matches config.yaml default).
+    Verify examine treats it as N/A with reason 'disabled'."""
+    run = examine.run_examine(synthetic_grid["dataset_root"], _cfg(),
+                              data_root=synthetic_grid["data_root"])
+    v = run.verdicts[(5, 5)]
+    r = v["rules"].get("C-CUMDIFF")
+    assert r is not None
+    assert r["level"] is None
+    assert "disabled" in r["reason"].lower()
+
+
+def test_c_cumdiff_flags_jump_when_enabled(synthetic_grid):
+    """Inject a synthetic norm with a jump discontinuity; C-CUMDIFF should
+    put that cell in WARN/FAIL when enabled."""
+    root = synthetic_grid["dataset_root"]
+    data = synthetic_grid["data_root"]
+    e = np.linspace(8058.0, 9241.0, 4000)
+    e0 = 8346.0
+    norm = 0.5 + 0.5 * np.arctan((e - e0) / 2.0) / (np.pi / 2)
+    norm[e > (e0 + 60)] += 0.05                             # jump artefact
+    _write_synthetic_cell(root, data, i=5, j=5, energy=e, norm=norm)
+
+    cfg = _cfg()
+    cfg["rules"]["C-CUMDIFF"] = {"enabled": True, "warn_z": 3, "fail_z": 5}
+    run = examine.run_examine(root, cfg, data_root=data)
+    v = run.verdicts[(5, 5)]
+    assert v["rules"]["C-CUMDIFF"]["level"] in (1, 2)
+    assert v["consistent"] in ("WARN", "FAIL")
 
 
 def test_coord_mapping_corners(synthetic_grid):

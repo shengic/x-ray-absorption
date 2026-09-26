@@ -27,6 +27,9 @@ NiXZ-121_naming_matrix.md
 # Reference screenshot used during development
 image.png
 
+# Copyrighted reference papers -- store locally, cite by DOI in docs
+references/
+
 # IDE / OS
 .idea/
 .vscode/

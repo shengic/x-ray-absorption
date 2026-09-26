@@ -16,11 +16,14 @@ Pipeline: raw `.txt` → [`larch.xafs.pre_edge()`](https://xraypy.github.io/xray
 - **Batch pipeline** — parses JAQ QEXAFS text files, runs `pre_edge()`,
   computes Q1–Q6 (edge step, high-freq noise, pre-edge flatness, E₀ shift vs
   `mu_ref`, glitch count, white-line height), and caches everything.
-- **Examine (rule-based)** — 8 configurable rules produce two flags per cell:
+- **Examine (rule-based)** — 9 configurable rules produce two flags per cell:
   `smooth` (measurement quality) and `consistent` (agreement with the rest
   of the grid). Rules are individually toggleable via a GUI panel or
   `config.yaml`; per-cell verdict + `usable` tag written to
   `data/**/*.examine.json`. `usable = GATE-EDGE PASS AND smooth in {PASS, WARN}`.
+  Includes `C-CUMDIFF` (opt-in) implementing Lippold 2005 criterion 7 —
+  standard-deviation-of-cumulative-difference against the 8-neighbour mean;
+  see `references/` and `TASK_examine_rules.md` §12 for the paper reading.
 - **Tkinter GUI** — three-panel browser (Z folders → X sections → info),
   light-blue progress bar during batch runs, **singleton** plot windows
   (Pre-edge / Normalized / Combined; each refreshes in place instead of
@@ -31,9 +34,10 @@ Pipeline: raw `.txt` → [`larch.xafs.pre_edge()`](https://xraypy.github.io/xray
   `.examine.json` (rule verdicts) under `data/`; PNG plots under `image/`.
   Layout is 1-to-1 with the MySQL schema planned in `NiXZ-121.md` §6
   (MySQL wiring deferred until schema is finalized).
-- **Tests** — 68 pytest tests covering regex/naming, discovery, data format,
+- **Tests** — 73 pytest tests covering regex/naming, discovery, data format,
   pipeline round-trip, metric shapes, cache I/O, GUI smoke, and the examine
-  engine (rules, N/A propagation, config hash, flag combine).
+  engine (rules, N/A propagation, config hash, flag combine, lippold_c7
+  identities, C-CUMDIFF jump detection).
 
 ## Install
 
@@ -117,8 +121,12 @@ Filename stem: `X{j}_{x}_{start}_{end}` (mirrors source). Folder disambiguates Z
 
 ## Project docs
 
-- [`NiXZ-121.md`](NiXZ-121.md) — consolidated technical reference: data
-  format, naming rules, 11 × 11 matrix, pipeline, quality metrics, DB schema.
+- [`NiXZ-121_project.md`](NiXZ-121_project.md) — **authoritative** project
+  reference (v1.3+): includes §5.1 literature review with Lippold 2005 /
+  Gaur 2026 / TXM-Wizard citations, §5.1.1 rule-provenance table, §10
+  discrepancy log (D1–D8), and the MySQL schema decision.
+- [`NiXZ-121.md`](NiXZ-121.md) — earlier consolidated summary; kept for
+  history. New details go into `NiXZ-121_project.md`.
 - [`HANDOFF.md`](HANDOFF.md) — architectural handoff for AI agents or new
   contributors; explains code structure, invariants, and next steps.
 - [`TASK_examine_rules.md`](TASK_examine_rules.md) — Phase 2 examine spec;
