@@ -55,6 +55,7 @@ class XANESViewer:
         self.plot_windows: dict[str, tk.Toplevel] = {}
         self.heatmap_window: tk.Toplevel | None = None
         self.rules_window: tk.Toplevel | None = None
+        self.rule_violations_window: tk.Toplevel | None = None
         self.config: dict | None = None
         self.heatmap_metric = tk.StringVar(value="edge_step")
         self.rule_enabled_vars: dict[str, tk.BooleanVar] = {}
@@ -82,6 +83,8 @@ class XANESViewer:
         ttk.Button(top, text="Choose root...", command=self.pick_root).pack(side=tk.LEFT)
         self.root_label = ttk.Label(top, text="(no root selected)", foreground="gray")
         self.root_label.pack(side=tk.LEFT, padx=8)
+        ttk.Button(top, text="Rule violations",
+                   command=self.show_rule_violations).pack(side=tk.RIGHT, padx=4)
         ttk.Button(top, text="11×11 heatmap",
                    command=self.show_heatmap).pack(side=tk.RIGHT, padx=4)
         ttk.Button(top, text="Rules...",
@@ -284,6 +287,14 @@ class XANESViewer:
             except tk.TclError:
                 pass
             self.heatmap_window = None
+        for attr in ("rules_window", "rule_violations_window"):
+            w = getattr(self, attr, None)
+            if w is not None:
+                try:
+                    w.destroy()
+                except tk.TclError:
+                    pass
+                setattr(self, attr, None)
 
     def show_preedge(self):
         if self.current_section:
@@ -637,6 +648,113 @@ class XANESViewer:
                    command=win.destroy).pack(side=tk.RIGHT, padx=4)
         ttk.Button(footer, text="Apply & Examine",
                    command=self._apply_rules_and_examine).pack(side=tk.RIGHT, padx=4)
+
+    def _load_all_examine_verdicts(self) -> dict[tuple[int, int], dict]:
+        verdicts: dict[tuple[int, int], dict] = {}
+        if not pl.DATA_ROOT.exists():
+            return verdicts
+        for p in pl.DATA_ROOT.rglob("*.examine.json"):
+            try:
+                v = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            i, j = v.get("i"), v.get("j")
+            if i is None or j is None:
+                continue
+            verdicts[(i, j)] = v
+        return verdicts
+
+    def show_rule_violations(self):
+        verdicts = self._load_all_examine_verdicts()
+        if not verdicts:
+            messagebox.showinfo("No examine results",
+                                 "Click 'Examine 121' first.")
+            return
+        sample = next(iter(verdicts.values()))
+        rule_ids = list(sample.get("rules", {}).keys())
+        if not rule_ids:
+            messagebox.showinfo("No rules", "Examine results have no rules.")
+            return
+
+        win = self.rule_violations_window
+        if win is None or not win.winfo_exists():
+            win = tk.Toplevel(self.root)
+            self.rule_violations_window = win
+        else:
+            for child in win.winfo_children():
+                child.destroy()
+        win.title("Rule violations — 11×11 per rule")
+
+        # Summary header
+        header = ttk.Frame(win, padding=(6, 4))
+        header.pack(fill=tk.X, side=tk.TOP)
+        n_cells = len(verdicts)
+        n_usable = sum(1 for v in verdicts.values() if v.get("usable"))
+        n_smooth_fail = sum(1 for v in verdicts.values()
+                             if v.get("smooth") == "FAIL")
+        n_consistent_fail = sum(1 for v in verdicts.values()
+                                 if v.get("consistent") == "FAIL")
+        ttk.Label(
+            header,
+            text=(f"{n_usable}/{n_cells} usable   |   "
+                  f"smooth FAIL: {n_smooth_fail}   "
+                  f"consistent FAIL: {n_consistent_fail}"),
+            font=("TkDefaultFont", 9, "bold"),
+        ).pack(anchor=tk.W)
+
+        # Small-multiples grid
+        from matplotlib.colors import ListedColormap
+        cmap = ListedColormap([self.FLAG_COLORS["PASS"],
+                                self.FLAG_COLORS["WARN"],
+                                self.FLAG_COLORS["FAIL"]])
+        cmap.set_bad(self.FLAG_COLORS["N/A"])
+        ncols = 4
+        nrows = (len(rule_ids) + ncols - 1) // ncols
+        fig = Figure(figsize=(3.0 * ncols, 3.0 * nrows), dpi=95)
+
+        for idx, rid in enumerate(rule_ids):
+            ax = fig.add_subplot(nrows, ncols, idx + 1)
+            grid = np.full((11, 11), np.nan)
+            n_warn = n_fail = 0
+            for (i, j), v in verdicts.items():
+                r = v.get("rules", {}).get(rid, {})
+                lvl = r.get("level")
+                if lvl is None:
+                    continue
+                grid[i, 10 - j] = float(lvl)
+                if lvl == 1:
+                    n_warn += 1
+                elif lvl == 2:
+                    n_fail += 1
+            ax.imshow(grid, cmap=cmap, vmin=-0.5, vmax=2.5,
+                       origin="lower", extent=(-5.5, 5.5, -5.5, 5.5))
+            ax.set_title(f"{rid}\nWARN={n_warn}  FAIL={n_fail}", fontsize=9)
+            ax.set_xticks([-5, 0, 5])
+            ax.set_yticks([-5, 0, 5])
+            ax.tick_params(labelsize=7)
+
+        fig.suptitle(
+            "Rule violations — green=PASS, yellow=WARN, red=FAIL, grey=N/A",
+            fontsize=9, y=0.995,
+        )
+        fig.tight_layout(rect=(0, 0, 1, 0.97))
+
+        canvas = FigureCanvasTkAgg(fig, master=win)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        NavigationToolbar2Tk(canvas, win).update()
+
+        # Click-to-select on any subplot
+        def _on_click(event):
+            if event.xdata is None or event.ydata is None:
+                return
+            x_r = int(round(event.xdata))
+            z_r = int(round(event.ydata))
+            if not (-5 <= x_r <= 5 and -5 <= z_r <= 5):
+                return
+            self._select_cell_by_xz(x_r, z_r)
+        canvas.mpl_connect("button_press_event", _on_click)
+        win.lift()
 
     def _apply_rules_and_examine(self):
         if self.config is None:
