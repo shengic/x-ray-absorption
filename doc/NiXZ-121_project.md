@@ -1,4 +1,4 @@
-<!-- NiXZ-121_project.md | version 1.3 by Albert Sheng | 2026-09-26 | C-CUMDIFF 已於 rules.py/examine.py 實作；§5.1.1 對照無異動 -->
+<!-- NiXZ-121_project.md | version 1.3.1 by Albert Sheng | 2026-09-27 | §9 參考資料改為表格（含查證狀態） -->
 
 # NiXZ-121 XANES 區段品質分析 — 專案整合文件
 
@@ -348,15 +348,19 @@ GUI
 
 ## 9. 參考資料
 
-1. M. Newville, *xraylarch* documentation §14.2, <https://xraypy.github.io/xraylarch/xafs_preedge.html>（larch 2026.3.1）
-2. M. Newville, *xraylarch* §14.1（`estimate_noise`），<https://xraypy.github.io/xraylarch/xafs_utilities.html>
-3. Y. Liu, F. Meirer et al., TXM-Wizard, *J. Synchrotron Rad.* 19, 281–287 (2012), doi:10.1107/S0909049511049144
-4. T.-C. Weng, G. S. Waldo, J. E. Penner-Hahn, MBACK, *J. Synchrotron Rad.* 12, 506–510 (2005)
-5. B. Lippold, W. Meyer-Klaucke, T. Meyer, G. Henkel, "Towards an automated quality control of XAS data", *J. Synchrotron Rad.* 12, 45–52 (2005), doi:10.1107/S0909049504028821
-6. Gaur et al., "Curating and sharing XAS data – Metadata and Scientific quality control", *Scientific Data* (2026), <https://www.nature.com/articles/s41597-026-07966-x>
-7. C. Leys, C. Ley, O. Klein, P. Bernard, L. Licata, "Detecting outliers: Do not use standard deviation around the mean, use absolute deviation around the median", *J. Exp. Soc. Psychol.* 49, 764–766 (2013)
-8. E. A. Stern, K. Kim, "Thickness effect on the extended-x-ray-absorption-fine-structure amplitude", *Phys. Rev. B* 23, 3781 (1981), doi:10.1103/PhysRevB.23.3781
-9. B. Ravel, M. Newville, ATHENA, ARTEMIS, HEPHAESTUS, *J. Synchrotron Rad.* 12, 537–541 (2005)
+| # | 作者 | 標題 | 出處 | 年 | DOI／連結 | 本專案用途 | 對應規則／章節 | 查證狀態 |
+|---|---|---|---|---|---|---|---|---|
+| 1 | M. Newville | XAFS: Pre-edge Subtraction, Normalization, and data treatment | xraylarch 文件 §14.2（2026.3.1） | 2026 | <https://xraypy.github.io/xraylarch/xafs_preedge.html> | `find_e0`、`pre_edge` 演算法與輸出；無品質判準 | §4、全部規則的輸入量 | 已讀全文 |
+| 2 | M. Newville | XAFS Functions: Overview and Naming Conventions | xraylarch 文件 §14.1 | 2026 | <https://xraypy.github.io/xraylarch/xafs_utilities.html> | `estimate_noise()`：確認為 EXAFS χ(R) 方法，不適用本 XANES 資料 | §4 | 已讀相關段落 |
+| 3 | Y. Liu, F. Meirer, P. A. Williams, J. Wang, J. C. Andrews, P. Pianetta | TXM-Wizard: a program for advanced data collection and evaluation in full-field transmission X-ray microscopy | *J. Synchrotron Rad.* 19, 281–287 | 2012 | 10.1107/S0909049511049144 | 邊緣跳躍濾波、正規化濾波、半高邊能、R-factor 圖 | GATE-EDGE 下限、R-SNR、R-PRE-FLAT、C-E0-NBR 概念 | 已讀全文 |
+| 4 | T.-C. Weng, G. S. Waldo, J. E. Penner-Hahn | A method for normalization of X-ray absorption spectra (MBACK) | *J. Synchrotron Rad.* 12, 506–510 | 2005 | 10.1107/S0909049504034193 | 替代歸一化方法（未採用，備查） | §4 | 僅見書目（xraylarch 引用） |
+| 5 | B. Lippold, W. Meyer-Klaucke, T. Meyer, G. Henkel | Towards an automated quality control of XAS data | *J. Synchrotron Rad.* 12, 45–52 | 2005 | 10.1107/S0909049504028821 | 累積差分光譜、判準 7、留一法、迭代剔除 | C-CUMDIFF、T-OUTLIER-SCAN、T-UPDOWN、T-DRIFT | 已讀全文（使用者提供 PDF） |
+| 6 | Gaur et al. | Curating and sharing XAS data – Metadata and Scientific quality control | *Scientific Data* | 2026 | 10.1038/s41597-026-07966-x | 穿透模式邊緣跳躍 0.5–2.0、邊能校正、導數峰 FWHM、多掃描判輻射損傷 | GATE-EDGE（D8）、CAL-EREF、T-DRIFT | 僅讀摘要式內容；完整作者名單與卷頁未核對 |
+| 7 | C. Leys, C. Ley, O. Klein, P. Bernard, L. Licata | Detecting outliers: Do not use standard deviation around the mean, use absolute deviation around the median | *J. Exp. Soc. Psychol.* 49, 764–766 | 2013 | 10.1016/j.jesp.2013.03.013 | 中位數 ± MAD 離群判定；建議門檻 2.5 | 所有 z-score 規則 | 書目由搜尋結果確認；DOI 與頁碼未逐字核對 |
+| 8 | E. A. Stern, K. Kim | Thickness effect on the extended-x-ray-absorption-fine-structure amplitude | *Phys. Rev. B* 23, 3781 | 1981 | 10.1103/PhysRevB.23.3781 | 厚度效應物理依據 | GATE-EDGE 上限 | 書目由搜尋結果確認；未讀全文 |
+| 9 | B. Ravel, M. Newville | ATHENA, ARTEMIS, HEPHAESTUS: data analysis for X-ray absorption spectroscopy using IFEFFIT | *J. Synchrotron Rad.* 12, 537–541 | 2005 | 10.1107/S0909049505012719 | R-factor 定義 R = Σ(data−fit)²/Σdata² | C-SHAPE | 僅見書目（TXM-Wizard 引用） |
+
+查證狀態說明：「已讀全文」＝本專案內容直接依據原文；「僅見書目」「未讀全文」者，引用其結論前應先取得原文核對。
 
 ---
 
@@ -383,6 +387,7 @@ GUI
 
 | 版本 | 日期 | 內容 |
 |---|---|---|
+| 1.3.1 | 2026-09-27 | by Albert Sheng。§9 參考資料改為表格：加入 DOI、本專案用途、對應規則、查證狀態（由 claude.ai 規劃端合併） |
 | 1.3 | 2026-09-26 | C-CUMDIFF（Lippold 2005 判準 7 vs 8 鄰格平均）於 `rules.py` / `examine.py` 完成實作與測試（73/73 通過），config 加對應條目，§5.1.1 標記為「v1.3 起實作」 |
 | 1.2 | 2026-09-26 | by Albert Sheng。§5.1 加入 Lippold 2005、Gaur 2026、Leys 2013、Stern & Kim 1981；新增 §5.1.1 規則出處對照；R4 改為 Lippold 判準 7；新增選用規則 C-CUMDIFF；§9 參考資料 5–9；§10 新增 D8 |
 | 1.1.1 | 2026-09-26 | §10 新增 D7（main.py 指標編號與文件不一致） |

@@ -1,4 +1,4 @@
-<!-- README.md | version 2.0 by Albert Sheng -->
+<!-- README.md | version 2.0.1 by Albert Sheng | 知識庫文件路徑改為 doc/ -->
 
 # NiXZ-121 XANES Analyzer
 
@@ -34,7 +34,7 @@ Ni sample (121 sections total). Pipeline: raw `.txt` →
 - **File cache** — `data/**/*.npz` (arrays), `data/**/*.json` (metrics),
   `data/**/*.examine.json` (rule verdict), `data/examine_run.json` (run
   manifest with `config_hash`), `image/**/*.png` (plots). 1-to-1 map onto
-  the MySQL schema in `NiXZ-121_project.md` §6 — MySQL wiring deferred
+  the MySQL schema in `doc/NiXZ-121_project.md` §6 — MySQL wiring deferred
   until the schema is finalized.
 - **Tests** — 73 pytest tests covering regex/naming, discovery, data
   format, pipeline round-trip, metric shapes, cache I/O, GUI smoke,
@@ -115,13 +115,13 @@ Filename stem `X{j}_{x}_{start}_{end}` mirrors the source; folder disambiguates 
 
 ## Project docs
 
-- **`NiXZ-121_project.md`** — authoritative technical reference (data
+- **`doc/NiXZ-121_project.md`** — authoritative technical reference (data
   format, naming rules, 11 × 11 matrix, pipeline steps, metric
   definitions, §5.1 literature review with citations to xraylarch, MBACK,
   TXM-Wizard, Lippold 2005, Gaur 2026, Leys 2013, Stern & Kim 1981;
   §5.1.1 rule-provenance table; §6 MySQL schema; §10 discrepancy log
   D1–D8).
-- **`TASK_examine_rules.md`** — Phase 2 spec + §12 implementation log
+- **`doc/TASK_examine_rules.md`** — Phase 2 spec + §12 implementation log
   (assumed vs actual key names, unit choices, Lippold paper reading,
   MySQL deferral, C-CUMDIFF status).
 - **`test/README.md`** — per-file test-suite guide.
@@ -183,12 +183,12 @@ Nothing in `examine.py` needs to change — topological sort picks it up.
 
 ### Deferred work
 
-Recorded in `NiXZ-121_project.md` §8:
+Recorded in `doc/NiXZ-121_project.md` §8:
 1. Full 121-file dataset (currently 3 Z folders present: Z0_-5, Z6_1, Z10_5)
 2. MAD-based threshold auto-tuning across the full grid
 3. `mu_ref` calibration reference confirmation (Ni foil?)
 4. Q7 (image indicator) — needs the `.bin` per-scan data
-5. MySQL wiring — schema in `NiXZ-121_project.md` §6; `.npz` + `.json` +
+5. MySQL wiring — schema in `doc/NiXZ-121_project.md` §6; `.npz` + `.json` +
    `.examine.json` map 1-to-1 onto `spectra`, `qc`, `qc_rule_result`,
    `qc_verdict`
 6. Reserved rules `T-DRIFT`, `T-UPDOWN`, `T-OUTLIER-SCAN`, `T-SATURATION`

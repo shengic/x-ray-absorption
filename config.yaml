@@ -6,7 +6,7 @@
 
 grid: {n: 11}
 
-edge:                       # Ni K-edge; see NiXZ-121.md §3, §4.1
+edge:                       # Ni K-edge; see doc/NiXZ-121_project.md §3, §4.2
   element: Ni
   edge: K
   e0_nominal_eV: 8333.0
