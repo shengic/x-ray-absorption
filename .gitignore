@@ -1,0 +1,36 @@
+# version 1.0 by Albert Sheng
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Generated caches (recreate with `python main.py --batch <root>`)
+data/
+image/
+output/
+
+# Raw dataset (multi-GB, not for git)
+image_AI_Ni/
+
+# Superseded docs (merged into NiXZ-121.md)
+NiXZ-121_XANES_guideline.md
+NiXZ-121_naming_matrix.md
+
+# Reference screenshot used during development
+image.png
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
