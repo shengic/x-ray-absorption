@@ -2,7 +2,7 @@
 
 Requires xraylarch. Skipped otherwise.
 
-version 1.0 by Albert Sheng
+version 1.1 by Albert Sheng
 """
 from __future__ import annotations
 

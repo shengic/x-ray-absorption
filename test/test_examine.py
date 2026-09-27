@@ -3,7 +3,7 @@
 Does NOT run larch — writes pipeline-shaped .json + .npz files by hand into
 a tmp_path, then exercises examine.run_examine end-to-end.
 
-version 1.0.0 by Albert Sheng
+version 1.1.0 by Albert Sheng
 """
 
 from __future__ import annotations
