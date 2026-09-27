@@ -11,7 +11,7 @@ and caches results:
 
 where {stem} = "X{j}_{x}_{start}_{end}".
 
-version 1.2 by Albert Sheng
+version 1.3 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -23,13 +23,19 @@ from pathlib import Path
 
 import numpy as np
 
-PIPELINE_VERSION = "1.2"
+PIPELINE_VERSION = "1.3"
 
 DATA_ROOT = Path("data")
 IMAGE_ROOT = Path("image")
 
-FNAME_RE = re.compile(r"^X(\d+)_(-?\d+)_(\d+)_(\d+)_XANES\.txt$")
+# v1.3: case-insensitive so 'x5_0_...' (see D9) is treated the same as 'X5_0_...'.
+# Output stems are always uppercase (built from parsed j/x), so cache filenames
+# stay uniform regardless of source-file case.
+FNAME_RE = re.compile(r"^X(\d+)_(-?\d+)_(\d+)_(\d+)_XANES\.txt$", re.IGNORECASE)
 ZDIR_RE = re.compile(r"^Z(\d+)_(-?\d+)$")
+
+EXPECTED_Z_COUNT = 11
+EXPECTED_X_PER_Z = 11
 
 
 @dataclass(frozen=True)
@@ -90,14 +96,64 @@ def discover_z_dirs(root: Path) -> list[Path]:
 
 
 def discover_x_files(z_dir: Path) -> list[Path]:
-    """Return X sections sorted by j. Windows glob is case-insensitive, so
-    filter strictly by FNAME_RE to drop malformed names (e.g. lowercase x)."""
+    """Return X sections sorted by j. Uses case-insensitive `FNAME_RE` so
+    files starting with lowercase 'x' (D9) are matched. Filenames that do
+    not match `FNAME_RE` at all are dropped silently -- use `validate_root`
+    to get a report of what was dropped and where."""
     def _key(p: Path) -> int:
         m = FNAME_RE.match(p.name)
         return int(m[1]) if m else 999
     return sorted(
-        (p for p in z_dir.glob("X*_XANES.txt") if FNAME_RE.match(p.name)),
+        (p for p in z_dir.glob("*_XANES.txt") if FNAME_RE.match(p.name)),
         key=_key,
+    )
+
+
+@dataclass(frozen=True)
+class ValidationReport:
+    """Snapshot of a dataset root: which Z folders exist, how many X files
+    each contains, and which filenames were dropped by FNAME_RE."""
+    z_folders: tuple[str, ...]
+    per_z_count: dict[str, int]
+    per_z_skipped: dict[str, tuple[str, ...]]
+    total_x: int
+
+    @property
+    def incomplete_z(self) -> list[str]:
+        return [z for z, n in self.per_z_count.items() if n != EXPECTED_X_PER_Z]
+
+    def as_lines(self) -> list[str]:
+        lines: list[str] = [
+            f"Z folders:   {len(self.z_folders)}/{EXPECTED_Z_COUNT}",
+            f"Total X:     {self.total_x}/{EXPECTED_Z_COUNT * EXPECTED_X_PER_Z}",
+        ]
+        for z in self.incomplete_z:
+            lines.append(f"  incomplete: {z} has {self.per_z_count[z]}/{EXPECTED_X_PER_Z}")
+        for z, files in self.per_z_skipped.items():
+            for f in files:
+                lines.append(f"  skipped (does not match FNAME_RE): {z}/{f}")
+        return lines
+
+
+def validate_root(root: Path) -> ValidationReport:
+    zs = discover_z_dirs(root)
+    per_count: dict[str, int] = {}
+    per_skipped: dict[str, tuple[str, ...]] = {}
+    total = 0
+    for z in zs:
+        matched = discover_x_files(z)
+        per_count[z.name] = len(matched)
+        skipped = tuple(
+            p.name for p in z.glob("*_XANES.txt") if not FNAME_RE.match(p.name)
+        )
+        if skipped:
+            per_skipped[z.name] = skipped
+        total += len(matched)
+    return ValidationReport(
+        z_folders=tuple(z.name for z in zs),
+        per_z_count=per_count,
+        per_z_skipped=per_skipped,
+        total_x=total,
     )
 
 

@@ -1,4 +1,4 @@
-<!-- README.md | version 2.0.2 by Albert Sheng | R-EDGE-FWHM + R-NORM-COEFS 加入 -->
+<!-- README.md | version 2.0.3 by Albert Sheng | D9 fix: FNAME_RE case-insensitive + validate_root completeness check -->
 
 # NiXZ-121 XANES Analyzer
 
@@ -37,7 +37,7 @@ Ni sample (121 sections total). Pipeline: raw `.txt` →
   manifest with `config_hash`), `image/**/*.png` (plots). 1-to-1 map onto
   the MySQL schema in `doc/NiXZ-121_project.md` §6 — MySQL wiring deferred
   until the schema is finalized.
-- **Tests** — 79 pytest tests covering regex/naming, discovery, data
+- **Tests** — 83 pytest tests covering regex/naming, discovery, data
   format, pipeline round-trip, metric shapes, cache I/O, GUI smoke,
   examine engine (rules, N/A propagation, config-hash determinism,
   flag combine, lippold_c7 identities, C-CUMDIFF jump detection,
@@ -146,11 +146,12 @@ test/                  73-test pytest suite
 
 ### Sharp edges (bugs I hit or foresee)
 
-1. **Windows glob is case-insensitive** — `Z6_1/x5_0_666_786_XANES.txt`
-   (lowercase `x`) was included by `glob("X*_XANES.txt")` and crashed the
-   sort. `pipeline.discover_x_files` now strictly filters by `FNAME_RE`
-   so malformed names drop silently. Rename lowercase files to uppercase
-   to recover the 121st section.
+1. **Filename case** — `Z6_1/x5_0_666_786_XANES.txt` had a lowercase `x`.
+   Before v1.3 `FNAME_RE = "^X..."` silently dropped it, giving 120/121.
+   Fixed by adding `re.IGNORECASE` to `FNAME_RE` + `discover_x_files`
+   glob relaxed to `*_XANES.txt`. Output stems are still uppercase (built
+   from parsed `j`/`x`), so cache filenames stay uniform. `validate_root`
+   reports per-Z-folder completeness + any filename that fails the regex.
 2. **`g.pre1` doesn't exist** — larch stores those parameters under
    `g.pre_edge_details.pre1` (and `.pre2, .norm1, .norm2, .nnorm, .nvict`).
 3. **E₀ garbage on empty regions** — corner sections with no Ni signal

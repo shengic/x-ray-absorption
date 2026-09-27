@@ -1,4 +1,4 @@
-<!-- status.md | version 1.0 by Albert Sheng | 2026-09-27 | 由 claude.ai 規劃端依 repo 現況建立 -->
+<!-- status.md | version 1.1 by Albert Sheng | 2026-09-27 | D9 結案；121/121 已處理與 Examine -->
 # NiXZ-121 XANES Viewer — 專案狀態
 
 最後更新：2026-09-27 18:30（UTC+8）　依據：commit `9765ac6`（2026-09-27 06:52）與工作目錄現況
@@ -11,18 +11,18 @@
 
 | 檔案 | 版本 |
 |---|---|
-| `doc/NiXZ-121_project.md` | 1.4.1 |
+| `doc/NiXZ-121_project.md` | 1.4.2 |
 | `doc/TASK_examine_rules.md` | 1.4 |
-| `doc/status.md` | 1.0 |
+| `doc/status.md` | 1.1 |
 | `CLAUDE.md` | 1.1 |
-| `README.md` | 2.0.2 |
-| `main.py` | 1.1 |
-| `pipeline.py` | 1.2 |
+| `README.md` | 2.0.3 |
+| `main.py` | 1.2 |
+| `pipeline.py` | 1.3 |
 | `rules.py` | 1.2.0 |
 | `examine.py` | 1.2.0 |
 | `config.yaml` | 1.2.0 |
 
-測試：最近一次紀錄 79/79 通過（TASK 文件 v1.4）。本檔建立時未重跑。
+測試：83/83 通過（+4：case-insensitive FNAME_RE、validate_root 完整性、regex skipped 報告、lowercase 認可）。
 
 ---
 
@@ -47,8 +47,8 @@
 
 ## 3. 目前資料處理結果
 
-- `data/` 內已處理 **120 / 121** 格（`.json` + `.npz` + `.examine.json` 各 120）。
-- 缺少：`Z6_1` 的中心格 (x, z) = (0, +1)。原因見 §5 D9。
+- `data/` 內已處理 **121 / 121** 格（`.json` + `.npz` + `.examine.json` 各 121）。
+- Examine 結果：run_id `987973d5`，**76/121 usable**（v1.4 新規則 R-EDGE-FWHM 與 R-NORM-COEFS 皆已啟用；門檻尚未以實資料校準）。
 
 ---
 
@@ -56,12 +56,12 @@
 
 | 優先 | 項目 | 負責 |
 |---|---|---|
-| 1 | 修正 D9（檔名大小寫），重跑 Process all + Examine，確認 121/121 | CLI |
-| 2 | commit `test/` 下 3 個未提交檔（README.md、test_examine.py、test_pipeline.py，+17／−10 行） | CLI |
-| 3 | 以 121 格實際分佈與目視對照校準門檻（GATE-EDGE D8、R-EDGE-FWHM、R-NORM-COEFS、z 門檻） | 使用者＋規劃端 |
-| 4 | 確認 `.bin` 格式後實作 T-* 規則 | 待資料（project.md §8 #2） |
-| 5 | MySQL 接線（`db.enabled: false`） | 待 schema 定稿 |
-| 6 | `combine_mode: weighted`（目前拋 NotImplementedError） | 未排程 |
+| ~~1~~ | ~~修正 D9（檔名大小寫），重跑 Process all + Examine，確認 121/121~~ | ~~CLI~~ **已完成 2026-09-27** |
+| ~~2~~ | ~~commit `test/` 下 3 個未提交檔~~ | ~~CLI~~ **已完成 2026-09-27** |
+| 1 | 以 121 格實際分佈與目視對照校準門檻（GATE-EDGE D8、R-EDGE-FWHM、R-NORM-COEFS、z 門檻） | 使用者＋規劃端 |
+| 2 | 確認 `.bin` 格式後實作 T-* 規則 | 待資料（project.md §8 #2） |
+| 3 | MySQL 接線（`db.enabled: false`） | 待 schema 定稿 |
+| 4 | `combine_mode: weighted`（目前拋 NotImplementedError） | 未排程 |
 
 ---
 
@@ -69,7 +69,7 @@
 
 | ID | 摘要 | 狀態 |
 |---|---|---|
-| D9 | `image_AI_Ni/Z6_1/x5_0_666_786_XANES.txt` 開頭為小寫 `x`；`pipeline.FNAME_RE` 為 `^X...`（大小寫敏感），Windows 上 `glob("X*")` 不分大小寫會列出、再被 regex 濾掉 → 該格**無警告地略過** | 開放 |
+| D9 | `image_AI_Ni/Z6_1/x5_0_666_786_XANES.txt` 開頭為小寫 `x`；`pipeline.FNAME_RE` 為 `^X...`（大小寫敏感），Windows 上 `glob("X*")` 不分大小寫會列出、再被 regex 濾掉 → 該格**無警告地略過** | **結案（2026-09-27）**：`FNAME_RE` 加 `re.IGNORECASE`；新增 `validate_root()` 完整性檢查；121/121 已重跑 |
 | D2 | 各 Z 資料夾的區段編號不同（例：Z6_1 為 1_120、134_254、268_388…；Z5_0 為 1_120、136_256、272_392…），`X0_5_1_120` 同名屬巧合 | 已釐清，見 §10 |
 | D8 | GATE-EDGE 門檻 [0.1, 1.5] vs Gaur 2026 [0.5, 2.0] | 開放 |
 
@@ -88,4 +88,5 @@
 
 | 版本 | 日期 | 內容 |
 |---|---|---|
+| 1.1 | 2026-09-27 | CLI 端更新：D9 結案（`FNAME_RE` IGNORECASE + `validate_root` + GUI 完整性顯示 + `_select_cell_by_xz` case-insensitive）；`--batch` 重跑產出 121/121 sections, 0 errors；Examine 121 cells, 76 usable；83/83 tests；§1 版本、§3 處理結果、§4 待辦、§5 D9 狀態全部同步 |
 | 1.0 | 2026-09-27 | by Albert Sheng。初版：依 commit 9765ac6 與工作目錄現況建立；記錄 120/121 處理結果與 D9 |

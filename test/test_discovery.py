@@ -1,6 +1,6 @@
 """Folder / file discovery ordering and completeness.
 
-version 1.0 by Albert Sheng
+version 1.1 by Albert Sheng
 """
 from __future__ import annotations
 
@@ -53,14 +53,45 @@ def test_at_most_11_z_folders(data_root):
     assert len(pl.discover_z_dirs(data_root)) <= 11
 
 
-def test_discover_x_files_drops_malformed_names(tmp_path):
-    """Malformed filenames (wrong case, missing suffix, wrong prefix) must
-    be excluded rather than causing downstream parse failures."""
+def test_discover_x_files_accepts_lowercase_and_uppercase_x(tmp_path):
+    """v1.3 (D9 fix): FNAME_RE is case-insensitive so 'x5_...' and 'X0_...'
+    are both accepted. Files that don't match FNAME_RE at all are dropped."""
     z = tmp_path / "Z5_0"
     z.mkdir()
-    (z / "X0_5_1_120_XANES.txt").write_text("")   # valid
-    (z / "x5_0_666_786_XANES.txt").write_text("")  # lowercase x -- reject
-    (z / "X0_5_1_120.txt").write_text("")          # no _XANES -- reject
-    (z / "Y0_5_1_120_XANES.txt").write_text("")    # wrong prefix -- reject
-    xs = pl.discover_x_files(z)
-    assert [p.name for p in xs] == ["X0_5_1_120_XANES.txt"]
+    (z / "X0_5_1_120_XANES.txt").write_text("")     # valid uppercase
+    (z / "x5_0_666_786_XANES.txt").write_text("")   # valid lowercase (D9)
+    (z / "X0_5_1_120.txt").write_text("")           # no _XANES -- reject
+    (z / "Y0_5_1_120_XANES.txt").write_text("")     # wrong prefix -- reject
+    names = [p.name for p in pl.discover_x_files(z)]
+    assert names == ["X0_5_1_120_XANES.txt", "x5_0_666_786_XANES.txt"]
+
+
+def test_validate_root_flags_incomplete_z(tmp_path):
+    z1 = tmp_path / "Z0_-5"
+    z1.mkdir()
+    (z1 / "X0_5_1_120_XANES.txt").write_text("")
+    (z1 / "X1_4_134_254_XANES.txt").write_text("")
+    r = pl.validate_root(tmp_path)
+    assert r.total_x == 2
+    assert "Z0_-5" in r.incomplete_z
+    assert r.per_z_count["Z0_-5"] == 2
+
+
+def test_validate_root_reports_regex_skipped(tmp_path):
+    z1 = tmp_path / "Z5_0"
+    z1.mkdir()
+    (z1 / "X0_5_1_120_XANES.txt").write_text("")
+    (z1 / "Y9_9_1_120_XANES.txt").write_text("")
+    r = pl.validate_root(tmp_path)
+    assert "Y9_9_1_120_XANES.txt" in r.per_z_skipped["Z5_0"]
+
+
+def test_validate_root_recognises_lowercase_x_as_matched(tmp_path):
+    """D9: lowercase-x files count toward the per-Z quota, not toward
+    per_z_skipped."""
+    z = tmp_path / "Z6_1"
+    z.mkdir()
+    (z / "x5_0_666_786_XANES.txt").write_text("")
+    r = pl.validate_root(tmp_path)
+    assert r.per_z_count["Z6_1"] == 1
+    assert "Z6_1" not in r.per_z_skipped

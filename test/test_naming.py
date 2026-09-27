@@ -1,6 +1,6 @@
 """Filename regex, ZDIR regex, and parse_section field extraction.
 
-version 1.0 by Albert Sheng
+version 1.1 by Albert Sheng
 """
 from __future__ import annotations
 
@@ -21,6 +21,13 @@ def test_fname_re_double_digit_negative_x():
 
 def test_fname_re_rejects_wrong_prefix():
     assert pl.FNAME_RE.match("Y0_5_1_120_XANES.txt") is None
+
+
+def test_fname_re_is_case_insensitive():
+    """v1.3 (D9 fix): lowercase 'x' filenames must be matched."""
+    m = pl.FNAME_RE.match("x5_0_666_786_XANES.txt")
+    assert m is not None
+    assert m.groups() == ("5", "0", "666", "786")
 
 
 def test_fname_re_rejects_missing_suffix():

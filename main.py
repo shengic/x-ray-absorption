@@ -15,7 +15,7 @@ Cache:
 Batch mode (no GUI):
     python main.py --batch image_AI_Ni
 
-version 1.1 by Albert Sheng
+version 1.2 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -172,10 +172,19 @@ class XANESViewer:
         self.lb_x.delete(0, tk.END)
         if not self.dataset_root:
             return
+        report = pl.validate_root(self.dataset_root)
         z_dirs = pl.discover_z_dirs(self.dataset_root)
         for zd in z_dirs:
             self.lb_z.insert(tk.END, zd.name)
-        self.status.set(f"{len(z_dirs)} Z folder(s) found")
+        incomplete = report.incomplete_z
+        n_skipped = sum(len(v) for v in report.per_z_skipped.values())
+        msg = (f"{len(z_dirs)} Z folder(s), {report.total_x}/"
+               f"{pl.EXPECTED_Z_COUNT * pl.EXPECTED_X_PER_Z} X files")
+        if incomplete:
+            msg += f"  |  incomplete: {', '.join(incomplete)}"
+        if n_skipped:
+            msg += f"  |  {n_skipped} filename(s) skipped by regex"
+        self.status.set(msg)
 
     def on_z_select(self, _evt):
         sel = self.lb_z.curselection()
@@ -514,7 +523,9 @@ class XANESViewer:
         self.lb_z.selection_set(z_items.index(zname))
         self.on_z_select(None)
         x_items = list(self.lb_x.get(0, tk.END))
-        match = [nm for nm in x_items if nm.startswith(f"X{j}_{x}_")]
+        prefix = f"X{j}_{x}_"
+        match = [nm for nm in x_items
+                 if nm.upper().startswith(prefix.upper())]
         if not match:
             self.status.set(f"({x},{z}) → no X{j}_{x} in {zname}")
             return
@@ -796,7 +807,12 @@ def _coerce(raw: str):
 
 def run_batch(root: Path, status_cb=None, progress_cb=None,
               tk_root=None) -> tuple[int, int]:
-    txts = sorted(root.rglob("X*_XANES.txt"))
+    report = pl.validate_root(root)
+    for line in report.as_lines():
+        print(f"[validate] {line}", file=sys.stderr)
+    txts = sorted(
+        p for p in root.rglob("*_XANES.txt") if pl.FNAME_RE.match(p.name)
+    )
     total = len(txts)
     n_ok = n_err = 0
     for i, txt in enumerate(txts, 1):
