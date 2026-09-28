@@ -1,4 +1,4 @@
-<!-- status.md | version 1.11 by Albert Sheng | 2026-09-28 | Examine 121 完成後自動彈出結果摘要面板 -->
+<!-- status.md | version 1.12 by Albert Sheng | 2026-09-28 | 新增 NiXZ-121_Report.docx + build_report.py -->
 # NiXZ-121 XANES Viewer — 專案狀態
 
 最後更新：2026-09-27 18:30（UTC+8）　依據：commit `9765ac6`（2026-09-27 06:52）與工作目錄現況
@@ -42,6 +42,7 @@
 | T-DRIFT、T-UPDOWN、T-OUTLIER-SCAN、T-SATURATION | 預留，未實作（需 `.bin` 逐條光譜） |
 
 - 知識庫移至 `doc/`，`CLAUDE.md` 以 `@doc/...` 自動載入。
+- `NiXZ-121_Report.docx`：技術報告（Part I，journal-style）+ 使用手冊（Part II），共 130 段、6 表、9 條 OMML 顯示公式、38 標題。由 `build_report.py` 產生（用 python-docx + OMML XML 注入方式產生 Word 原生數學式）。字型設定：正文 Georgia，中文 eastAsia 掛標楷體，程式碼 Consolas。
 - v1.4 (main.py) 將 `Rules...` 與 `Edge...` 合併為單一 **`Config...`** 按鈕；Toplevel 內含 `ttk.Notebook` 兩分頁（Rules / Edge），共用 Save-to-yaml checkbox + Apply & Examine + Close。刪除 `show_rules_panel`、`show_edge_panel`、兩份 `_apply_*` 與 `rules_window`、`edge_window` 等狀態欄位（-30 行）。校準時可一次動兩區、跑一次 Examine。
 - v1.5 (main.py) Config 面板：每條規則名稱與每個 edge 欄位名稱都是**可點擊的說明連結**（藍色底線、hand2 游標）。點擊 → messagebox 顯示：rule 端 flag/scope/requires + docstring；edge 端 curated 說明字典。rules.py v1.3.0 補齊 7 條規則的 docstring（GATE-EDGE、CAL-EREF、R-NOISE-HF、R-PRE-FLAT、R-GLITCH、R-SNR、C-SHAPE、C-E0-NBR），R-EDGE-FWHM/R-NORM-COEFS/C-CUMDIFF 原本就有。
 - v1.6 (main.py) 說明面板改為**非阻塞 Toplevel**（不再用 messagebox）：可捲動 Text 內容 + 「關閉 (Close)」按鈕；`transient(root)` 讓它跟隨主視窗但不搶焦點，主視窗仍可操作。多個 rule/edge 說明可並開比對。rules.py v1.3.1 與 main.py `EDGE_HELP` 字典**全部翻譯為繁體中文**。
@@ -93,6 +94,7 @@
 
 | 版本 | 日期 | 內容 |
 |---|---|---|
+| 1.12 | 2026-09-28 | 新增 `build_report.py` 與其輸出 `NiXZ-121_Report.docx`。Word 檔涵蓋 Part I 技術報告（Abstract、Dataset、Stage 1 pipeline、Stage 2 規則框架與各規則數學定義、閾值校準、實作、當前結果、參考文獻）與 Part II 使用手冊（安裝、資料準備、GUI 各功能、Config 編輯器、CLI、config.yaml 對照、快取檔案表、疑難排解、測試）。方程式全部用 OMML（Office MathML）XML 直接注入 python-docx 的 body，Word 開啟後為原生可編輯數學式。requirements.txt 加上選用 dep `python-docx>=1.2`。 |
 | 1.11 | 2026-09-28 | main.py v1.10：`Examine 121` 完成後自動開一個**單例 Toplevel 結果面板**顯示：run_id、computed_at、cells 總數、usable 分子/分母/%、smooth 與 consistent 的 PASS/WARN/FAIL/N/A 分佈（含 ASCII bar chart）、每條規則的 PASS/WARN/FAIL/N/A tally。附「Rule violations」「11×11 heatmap」「關閉」三個按鈕。字型用 Consolas 10pt 配合表格對齊；`transient(root)` 非阻塞。狀態列的一行摘要保留。 |
 | 1.10 | 2026-09-28 | main.py v1.9：`Choose root...` 對話框預設 `initialdir = 專案根目錄`（`Path(__file__).resolve().parent`），不再自動潛入 `image_AI_Ni`。已選過 root 之後，下次點會回到「上次 root 的父目錄」方便挑 sibling 資料夾。 |
 | 1.9 | 2026-09-28 | main.py v1.8：help panel 中英**混排**。ASCII 用 Georgia，中文用**標楷體**（DFKai-SB kaishu，於 Windows 中文區域以 `標楷體` 中文名註冊），透過 Tk Text 的 tag 依 script 切換字型；neutral（數字/空白/標點）繼承上下文，不會 mid-word 跳字型。字級 12pt，視窗 620×400，行距 spacing1/3=3。 |

@@ -1,6 +1,8 @@
-# version 1.1 by Albert Sheng
+# version 1.2 by Albert Sheng
 numpy>=2.0
 matplotlib>=3.10
 xraylarch>=2026.3
 pyyaml>=6.0
 pytest>=8.0
+# Optional -- only required to regenerate NiXZ-121_Report.docx via build_report.py:
+python-docx>=1.2
