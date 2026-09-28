@@ -8,7 +8,7 @@ Equations use OMML (Office MathML) so Word can render them natively.
 Run:
     python build_report.py
 
-version 1.1 by Albert Sheng
+version 1.2 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -157,6 +157,28 @@ def bullet(doc: Document, text: str) -> None:
 
 def numbered(doc: Document, text: str) -> None:
     doc.add_paragraph(text, style="List Number")
+
+
+def add_reference(doc: Document, template: str) -> None:
+    """Add one reference paragraph with hanging indent. Parses inline
+    Markdown-lite formatting: **bold**, *italic*. Journal-paper style."""
+    import re
+    p = doc.add_paragraph()
+    p.paragraph_format.left_indent = Cm(0.75)
+    p.paragraph_format.first_line_indent = Cm(-0.75)
+    p.paragraph_format.space_after = Pt(4)
+    tokens = re.split(r'(\*\*[^*]+\*\*|\*[^*]+\*)', template)
+    for tok in tokens:
+        if not tok:
+            continue
+        if tok.startswith("**") and tok.endswith("**"):
+            r = p.add_run(tok[2:-2])
+            r.bold = True
+        elif tok.startswith("*") and tok.endswith("*"):
+            r = p.add_run(tok[1:-1])
+            r.italic = True
+        else:
+            p.add_run(tok)
 
 
 def make_table(doc: Document, header, rows) -> None:
@@ -849,40 +871,84 @@ def part1(doc: Document) -> None:
 
     # ----------------------------------------------------------------------
     h2(doc, "References")
+
+    add_reference(
+        doc,
+        '[1] M. Newville, "XAFS: Pre-edge Subtraction, Normalization, and '
+        'data treatment," *xraylarch* 2026.3.1 documentation §14.2, '
+        'https://xraypy.github.io/xraylarch/xafs_preedge.html.'
+    )
+    add_reference(
+        doc,
+        '[2] M. Newville, "XAFS Functions: Overview and Naming Conventions," '
+        '*xraylarch* 2026.3.1 documentation §14.1, '
+        'https://xraypy.github.io/xraylarch/xafs_utilities.html.'
+    )
+    add_reference(
+        doc,
+        '[3] Y. Liu, F. Meirer, P. A. Williams, J. Wang, J. C. Andrews, and '
+        'P. Pianetta, "TXM-Wizard: a program for advanced data collection '
+        'and evaluation in full-field transmission X-ray microscopy," '
+        '*J. Synchrotron Rad.* **19**, 281–287 (2012). '
+        'doi:10.1107/S0909049511049144.'
+    )
+    add_reference(
+        doc,
+        '[4] T.-C. Weng, G. S. Waldo, and J. E. Penner-Hahn, "A method for '
+        'normalization of X-ray absorption spectra," '
+        '*J. Synchrotron Rad.* **12**, 506–510 (2005). '
+        'doi:10.1107/S0909049504034193.'
+    )
+    add_reference(
+        doc,
+        '[5] B. Lippold, W. Meyer-Klaucke, T. Meyer, and G. Henkel, '
+        '"Towards an automated quality control of XAS data," '
+        '*J. Synchrotron Rad.* **12**, 45–52 (2005). '
+        'doi:10.1107/S0909049504028821.'
+    )
+    add_reference(
+        doc,
+        '[6] A. Gaur et al., "Curating and sharing XAS data — Metadata and '
+        'Scientific quality control," *Scientific Data* (2026). '
+        'doi:10.1038/s41597-026-07966-x.'
+    )
+    add_reference(
+        doc,
+        '[7] C. Leys, C. Ley, O. Klein, P. Bernard, and L. Licata, '
+        '"Detecting outliers: Do not use standard deviation around the '
+        'mean, use absolute deviation around the median," '
+        '*J. Exp. Soc. Psychol.* **49**, 764–766 (2013). '
+        'doi:10.1016/j.jesp.2013.03.013.'
+    )
+    add_reference(
+        doc,
+        '[8] E. A. Stern and K. Kim, "Thickness effect on the extended-'
+        'x-ray-absorption-fine-structure amplitude," '
+        '*Phys. Rev. B* **23**, 3781–3787 (1981). '
+        'doi:10.1103/PhysRevB.23.3781.'
+    )
+    add_reference(
+        doc,
+        '[9] B. Ravel and M. Newville, "ATHENA, ARTEMIS, HEPHAESTUS: data '
+        'analysis for X-ray absorption spectroscopy using IFEFFIT," '
+        '*J. Synchrotron Rad.* **12**, 537–541 (2005). '
+        'doi:10.1107/S0909049505012719.'
+    )
+
     para(
         doc,
-        "The following sources ground individual rule choices; verification "
-        "status column indicates whether the original text was consulted "
-        "in full for this project."
-    )
-    make_table(
-        doc,
-        ["#", "Reference", "Used for", "Verified"],
-        [
-            ["1", "M. Newville, xraylarch 2026.3.1 documentation section 14.2",
-             "pre_edge algorithm and outputs", "yes"],
-            ["2", "M. Newville, xraylarch section 14.1 (estimate_noise)",
-             "confirmed as EXAFS chi(R) tool; not used here", "partially"],
-            ["3", "Y. Liu et al., TXM-Wizard, J. Synchrotron Rad. 19, 281 (2012)",
-             "GATE-EDGE lower bound, R-SNR, R-PRE-FLAT, C-E0-NBR concept",
-             "yes"],
-            ["4", "T.-C. Weng et al., MBACK, J. Synchrotron Rad. 12, 506 (2005)",
-             "alternative normalization, not adopted", "bibliography only"],
-            ["5", "B. Lippold et al., J. Synchrotron Rad. 12, 45 (2005)",
-             "C-CUMDIFF (criterion 7), reserved T-OUTLIER-SCAN family",
-             "yes"],
-            ["6", "Gaur et al., Sci. Data (2026)",
-             "GATE-EDGE upper bound, CAL-EREF concept, T-DRIFT motivation",
-             "abstract-level"],
-            ["7", "C. Leys et al., J. Exp. Soc. Psychol. 49, 764 (2013)",
-             "MAD-based robust z; warn_z = 2.5 default", "bibliography only"],
-            ["8", "E. A. Stern and K. Kim, Phys. Rev. B 23, 3781 (1981)",
-             "thickness effect, GATE-EDGE upper bound physical basis",
-             "bibliography only"],
-            ["9", "B. Ravel and M. Newville, J. Synchrotron Rad. 12, 537 (2005)",
-             "R-factor definition, C-SHAPE observable",
-             "bibliography only"],
-        ]
+        "Note on source verification. References [1], [3], and [5] were "
+        "consulted in full during the design of the corresponding rules "
+        "and can be cited authoritatively. References [4], [7], [8], and "
+        "[9] were confirmed from bibliographic search but not read in "
+        "full; their conclusions are cited by convention. Reference [6] "
+        "(Gaur 2026) was consulted at abstract level; the specific "
+        "recommendations we compare against in section 4.6 (edge-jump "
+        "window [0.5, 2.0], derivative-peak FWHM window [0.5, 2.0] eV) "
+        "should be verified against the full text before being adopted "
+        "in a downstream publication. Reference [2] was consulted for "
+        "the specific question of whether xraylarch's estimate_noise "
+        "applies to XANES data (it does not)."
     )
 
 

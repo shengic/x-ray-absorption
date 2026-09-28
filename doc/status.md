@@ -1,4 +1,4 @@
-<!-- status.md | version 1.13 by Albert Sheng | 2026-09-28 | NiXZ-121_Report.docx 加入 26 條 inline citations 與各規則物理依據段 -->
+<!-- status.md | version 1.14 by Albert Sheng | 2026-09-28 | 報告 §References 改為 journal-style 編號清單（hanging indent） -->
 # NiXZ-121 XANES Viewer — 專案狀態
 
 最後更新：2026-09-27 18:30（UTC+8）　依據：commit `9765ac6`（2026-09-27 06:52）與工作目錄現況
@@ -94,6 +94,7 @@
 
 | 版本 | 日期 | 內容 |
 |---|---|---|
+| 1.14 | 2026-09-28 | `NiXZ-121_Report.docx` **§References 改為 journal-style 編號清單**：每條 hanging indent、journal 名稱 italic、卷號 bold、含完整標題與 DOI；取代原本的 4 欄表格。build_report.py 加 `add_reference(doc, template)` helper（解析 `*italic*` / `**bold**` inline markup）。原表格中「Used for / Verified」欄位改寫為 Reference list 後方一段 "Note on source verification"（[1][3][5] 已讀全文；[6] 需優先核對）。 |
 | 1.13 | 2026-09-28 | `NiXZ-121_Report.docx` 加入 **26 條 inline citations [n]** 貫穿 Part I（涵蓋全部 9 篇文獻）；4.4 節擴充為 **Rule catalogue and physical basis**，每條規則（或規則群）新增一段物理／統計依據說明並綁定文獻（例：GATE-EDGE 下限援引 TXM-Wizard edge-jump filter [3] + Beer-Lambert；上限援引 Stern-Kim 厚度效應 [8]；R-EDGE-FWHM 說明 Ni 1s core-hole broadening 與 monochromator resolution 的卷積；R-GLITCH 提 Bragg glitch 與 top-up transient）。4.6 節 z 門檻校準補加 Gaussian tail 機率的具體數值。 |
 | 1.12 | 2026-09-28 | 新增 `build_report.py` 與其輸出 `NiXZ-121_Report.docx`。Word 檔涵蓋 Part I 技術報告（Abstract、Dataset、Stage 1 pipeline、Stage 2 規則框架與各規則數學定義、閾值校準、實作、當前結果、參考文獻）與 Part II 使用手冊（安裝、資料準備、GUI 各功能、Config 編輯器、CLI、config.yaml 對照、快取檔案表、疑難排解、測試）。方程式全部用 OMML（Office MathML）XML 直接注入 python-docx 的 body，Word 開啟後為原生可編輯數學式。requirements.txt 加上選用 dep `python-docx>=1.2`。 |
 | 1.11 | 2026-09-28 | main.py v1.10：`Examine 121` 完成後自動開一個**單例 Toplevel 結果面板**顯示：run_id、computed_at、cells 總數、usable 分子/分母/%、smooth 與 consistent 的 PASS/WARN/FAIL/N/A 分佈（含 ASCII bar chart）、每條規則的 PASS/WARN/FAIL/N/A tally。附「Rule violations」「11×11 heatmap」「關閉」三個按鈕。字型用 Consolas 10pt 配合表格對齊；`transient(root)` 非阻塞。狀態列的一行摘要保留。 |
