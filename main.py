@@ -15,7 +15,7 @@ Cache:
 Batch mode (no GUI):
     python main.py --batch image_AI_Ni
 
-version 1.7 by Albert Sheng
+version 1.8 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -646,45 +646,95 @@ class XANESViewer:
         lbl.bind("<Button-1>", lambda _e: on_click())
         return lbl
 
-    HELP_FONT_PREFERENCES = (
-        "Microsoft JhengHei UI",   # Windows 8+; modern Traditional Chinese UI
-        "Microsoft JhengHei",       # Windows Vista+; slightly wider metrics
-        "PingFang TC",              # macOS Traditional Chinese
-        "Noto Sans TC",             # Linux
-        "PMingLiU",                 # very old Windows fallback
+    HELP_EN_FONT_PREFERENCES = (
+        "Georgia",             # serif, requested
+        "Times New Roman",
+        "TkDefaultFont",
     )
-    HELP_FONT_SIZE = 11
+    HELP_CJK_FONT_PREFERENCES = (
+        "標楷體",              # DFKai-SB, kaishu / requested
+        "DFKai-SB",            # English alias, in case region registers it
+        "BiauKai",
+        "華康雅風體W3",         # DFHYYuanW3, another kaishu-ish option
+        "微軟正黑體",           # sans-serif fallback
+        "Microsoft JhengHei UI",
+        "PMingLiU",
+    )
+    HELP_FONT_SIZE = 12        # kaishu wants a touch larger for legibility
 
-    def _help_font(self):
-        """Pick the first available preferred font, or fall back to
-        TkDefaultFont. Returns a (family, size) tuple ready for tk widgets."""
+    def _pick_font(self, preferences: tuple[str, ...]):
+        """Return the first preferred family that exists on this system as
+        (family, size); fall back to TkDefaultFont at the same size."""
         from tkinter import font as tkfont
         available = set(tkfont.families(root=self.root))
-        for family in self.HELP_FONT_PREFERENCES:
+        for family in preferences:
             if family in available:
                 return (family, self.HELP_FONT_SIZE)
         return ("TkDefaultFont", self.HELP_FONT_SIZE)
 
+    @staticmethod
+    def _script_of(cp: int) -> str:
+        """Roughly classify a codepoint: 'cjk' for han + fullwidth,
+        'en' for ASCII letters, 'neutral' for spaces / digits / punctuation."""
+        if (0x4E00 <= cp <= 0x9FFF or       # CJK Unified
+                0x3400 <= cp <= 0x4DBF or   # Ext A
+                0x3000 <= cp <= 0x303F or   # CJK symbols & punct
+                0xFF00 <= cp <= 0xFFEF):    # Halfwidth & Fullwidth
+            return "cjk"
+        if 0x41 <= cp <= 0x5A or 0x61 <= cp <= 0x7A:
+            return "en"
+        return "neutral"
+
+    def _insert_mixed_script(self, text_widget, body: str):
+        """Insert `body` into the Text widget using tags 'en' and 'cjk',
+        switching per script so ASCII gets Georgia and CJK gets 標楷體.
+        Neutral characters (digits, punctuation) inherit the surrounding tag."""
+        current = "en"
+        run: list[str] = []
+        def _flush():
+            if run:
+                text_widget.insert("end", "".join(run), current)
+                run.clear()
+        for ch in body:
+            script = self._script_of(ord(ch))
+            if script == "neutral":
+                nxt = current
+            else:
+                nxt = script
+            if nxt != current:
+                _flush()
+                current = nxt
+            run.append(ch)
+        _flush()
+
     def _open_help_window(self, title: str, body: str):
         """Non-modal help panel with a Close button. Multiple can coexist;
-        does not block the main window (no grab, no wait_window). Body
-        uses a Traditional-Chinese-friendly UI font (Microsoft JhengHei UI
-        on Windows) with automatic fallback."""
+        does not block the main window (no grab, no wait_window). ASCII
+        runs render in Georgia; CJK runs render in 標楷體 (kaishu). Neutral
+        characters (spaces, digits, brackets) inherit the surrounding
+        script's tag, so `[E₀ + 150]` inside a Chinese sentence keeps its
+        brackets/digits in the kaishu tag rather than jumping between
+        typefaces mid-word."""
         win = tk.Toplevel(self.root)
         win.title(title)
-        win.geometry("580x380")
+        win.geometry("620x400")
         frame = ttk.Frame(win, padding=8)
         frame.pack(fill=tk.BOTH, expand=True)
-        text = tk.Text(frame, wrap="word",
-                       font=self._help_font(), height=15,
-                       padx=8, pady=6, spacing1=2, spacing3=2)
+        text = tk.Text(frame, wrap="word", height=15,
+                       padx=8, pady=6, spacing1=3, spacing3=3)
         scroll = ttk.Scrollbar(frame, orient="vertical",
                                command=text.yview)
         text.configure(yscrollcommand=scroll.set)
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
         text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        text.insert("1.0", body)
+
+        text.tag_configure("en",
+                            font=self._pick_font(self.HELP_EN_FONT_PREFERENCES))
+        text.tag_configure("cjk",
+                            font=self._pick_font(self.HELP_CJK_FONT_PREFERENCES))
+        self._insert_mixed_script(text, body)
         text.configure(state="disabled")
+
         footer = ttk.Frame(win, padding=(8, 4))
         footer.pack(fill=tk.X, side=tk.BOTTOM)
         ttk.Button(footer, text="關閉 (Close)",
