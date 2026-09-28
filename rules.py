@@ -6,7 +6,7 @@ and returns RuleResult(level, value, reason).
 
 Levels: PASS(0), WARN(1), FAIL(2), None = N/A.
 
-version 1.3.0 by Albert Sheng
+version 1.3.1 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -119,10 +119,10 @@ def _two_sided_z(v: float | None, stats: dict, params: dict,
 
 @rule("GATE-EDGE", flag="gate", scope="cell")
 def _gate_edge(ctx, cell, params) -> RuleResult:
-    """Hard bound on the edge_step (Δμ₀). Cells outside [min, max] FAIL and
-    are excluded from the baseline stats used by every downstream rule.
-    Params: min (lower bound, default 0.10 - excludes off-sample pixels),
-    max (upper bound, default 1.5 - guards against thickness effect)."""
+    """對 edge_step（Δμ₀）設硬邊界。超出 [min, max] 的格子判 FAIL，
+    並且不會進入下游規則使用的統計基準（median / MAD）。
+    參數：min（下限，預設 0.10，排除未打到樣品的邊緣像素）、
+    max（上限，預設 1.5，防厚度效應壓低 white line）。"""
     v = cell.meta.get("edge_step")
     if v is None:
         return RuleResult(FAIL, None, "edge_step missing")
@@ -134,13 +134,12 @@ def _gate_edge(ctx, cell, params) -> RuleResult:
 
 @rule("CAL-EREF", flag="gate", scope="grid")
 def _cal_eref(ctx, cell, params) -> RuleResult:
-    """Reference-channel energy-calibration gate. Two-stage check:
-    L1 -- mu_ref_e0 - e0_nominal_eV must fall inside mono_offset_window_eV
-         (catches mu_ref that picked a glitch instead of the true edge);
-    L3 -- |mu_ref_e0 - median(mu_ref_e0)| across the grid must be within
-         ref_e0_spread_tol_eV (Ni foil E0 should be constant grid-wide;
-         exceeding it means row-to-row drift).
-    L1 fail -> FAIL. L3 fail -> WARN. All thresholds come from config.edge.*."""
+    """參考通道能量校正閘，兩層檢查：
+    L1 — mu_ref_e0 − e0_nominal_eV 必須落在 mono_offset_window_eV 內
+         （防止 mu_ref 抓到 glitch 而非真正的邊）；
+    L3 — 全圖 |mu_ref_e0 − median(mu_ref_e0)| 必須在 ref_e0_spread_tol_eV 內
+         （Ni 箔 E0 全圖應為常數，超過即為列間漂移）。
+    L1 失敗 → FAIL；L3 失敗 → WARN。所有門檻取自 config.edge.*。"""
     ref = cell.meta.get("mu_ref_e0")
     if ref is None:
         return RuleResult(None, None, "mu_ref_e0 missing")
@@ -163,20 +162,19 @@ def _cal_eref(ctx, cell, params) -> RuleResult:
 
 @rule("R-NOISE-HF", flag="smooth", scope="grid", requires=("GATE-EDGE",))
 def _r_noise_hf(ctx, cell, params) -> RuleResult:
-    """Post-edge high-frequency noise. RMS of the 2nd difference of `flat`
-    for E >= E0 + 150 eV (EXAFS region). One-sided upper MAD z-score --
-    values much larger than the grid median indicate a noisy cell.
-    Params: warn_z (default 3), fail_z (default 5)."""
+    """後緣高頻雜訊。對 flat 於 E ≥ E₀ + 150 eV（EXAFS 區）做二階差分後 RMS。
+    單側上尾 MAD z-score — 遠高於全圖中位數的格子代表雜訊大。
+    參數：warn_z（預設 3）、fail_z（預設 5）。"""
     v = cell.meta.get("q2_hf_noise")
     return _upper_z(v, ctx.stats.get("q2_hf_noise"), params, "q2_hf_noise missing")
 
 
 @rule("R-PRE-FLAT", flag="smooth", scope="grid", requires=("GATE-EDGE",))
 def _r_pre_flat(ctx, cell, params) -> RuleResult:
-    """Pre-edge fit residual RMS on the raw μ (in [E0+pre1, E0+pre2]).
-    Grows when the pre-edge region isn't well described by a straight
-    line -- scattering, harmonic contamination, or leaks. One-sided
-    upper MAD z-score. Params: warn_z (default 3), fail_z (default 5)."""
+    """前緣擬合殘差 RMS，作用於原始 μ 於 [E₀+pre1, E₀+pre2] 區間。
+    當前緣無法用直線好好描述時會變大 — 散射、諧波污染、漏光。
+    單側上尾 MAD z-score。
+    參數：warn_z（預設 3）、fail_z（預設 5）。"""
     v = cell.meta.get("q3_pre_flatness")
     return _upper_z(v, ctx.stats.get("q3_pre_flatness"), params,
                     "q3_pre_flatness missing")
@@ -184,12 +182,12 @@ def _r_pre_flat(ctx, cell, params) -> RuleResult:
 
 @rule("R-EDGE-FWHM", flag="smooth", scope="grid", requires=("GATE-EDGE",))
 def _r_edge_fwhm(ctx, cell, params) -> RuleResult:
-    """Two-sided MAD z-score on the FWHM of dμ/dE around E0.
-    Broadening (too large) suggests thickness effect, inhomogeneity, or
-    beam vibration; unusually narrow (too small) suggests white-line loss
-    or E0 mis-identification. Grid-relative — self-tunes to whatever
-    beamline resolution the measurement session had (Gaur 2026 absolute
-    window 0.5-2.0 eV is only a sanity range, not used here)."""
+    """對 E₀ 附近 dμ/dE 峰的 FWHM 做雙側 MAD z-score。
+    太寬（過大）代表厚度效應、樣品不均、或 beam 抖動；
+    異常太窄（過小）代表 white line 流失或 E₀ 判定錯誤。
+    Grid-relative — 自動校準到當次量測期的 beamline 解析度
+    （Gaur 2026 的絕對窗 0.5–2.0 eV 僅作為 sanity 參考，此處不使用）。
+    參數：warn_z（預設 2.5，Leys 2013）、fail_z（預設 4，明確離群）。"""
     v = cell.meta.get("edge_fwhm_eV")
     return _two_sided_z(v, ctx.stats.get("edge_fwhm_eV"), params,
                         "edge_fwhm_eV missing (reprocess needed)")
@@ -197,11 +195,11 @@ def _r_edge_fwhm(ctx, cell, params) -> RuleResult:
 
 @rule("R-NORM-COEFS", flag="smooth", scope="grid", requires=("GATE-EDGE",))
 def _r_norm_coefs(ctx, cell, params) -> RuleResult:
-    """Covers §5.2 A Q3: normalization sanity. Combines pre_slope and the
-    two post-edge polynomial coefficients norm_c1, norm_c2 by taking the
-    single worst |z| among the three (MAD-scaled against grid median).
-    Detects scattering, harmonics, saturation, or misplaced pre/post-edge
-    windows -- issues that a well-behaved 121-grid should not share."""
+    """對應 §5.2 A Q3：正規化合理性。整合 pre_slope 與後緣多項式係數
+    norm_c1、norm_c2，取三者對全圖中位數的 max|z|（MAD-scaled）判定。
+    偵測散射、諧波、飽和、或前/後緣窗設定錯誤 — 正常 121 格網不應共享的問題。
+    reason 會標明是哪一個係數超標。
+    參數：warn_z（預設 2.5）、fail_z（預設 4）。"""
     values = {
         "pre_slope": cell.meta.get("pre_slope"),
         "norm_c1": cell.meta.get("norm_c1"),
@@ -236,12 +234,11 @@ def _r_norm_coefs(ctx, cell, params) -> RuleResult:
 
 @rule("R-GLITCH", flag="smooth", scope="grid", requires=("GATE-EDGE",))
 def _r_glitch(ctx, cell, params) -> RuleResult:
-    """Count of MAD-outlier points in `flat` for E >= E0 + 150 eV --
-    detects monochromator glitches, Bragg peaks, or top-up transients.
-    Two-tier decision:
-      1. absolute count > max_count -> FAIL immediately;
-      2. otherwise, one-sided upper MAD z-score against the grid.
-    Params: max_count (default 5), warn_z (3), fail_z (5)."""
+    """flat 於 E ≥ E₀ + 150 eV 區間內 MAD 離群點的計數 —
+    偵測單色器 glitch、Bragg 峰、top-up 注射瞬變。兩段判定：
+      1. 絕對計數 > max_count → 直接 FAIL；
+      2. 否則對全圖做單側上尾 MAD z-score。
+    參數：max_count（預設 5）、warn_z（預設 3）、fail_z（預設 5）。"""
     v = cell.meta.get("q5_glitches")
     if v is None:
         return RuleResult(None, None, "q5_glitches missing")
@@ -256,11 +253,11 @@ def _r_glitch(ctx, cell, params) -> RuleResult:
 
 @rule("R-SNR", flag="smooth", scope="grid", requires=("GATE-EDGE",))
 def _r_snr(ctx, cell, params) -> RuleResult:
-    """Edge-to-noise ratio: edge_step / q3_pre_flatness (both in raw μ ->
-    dimensionless). Lower SNR is bad, so this is a one-sided *lower*
-    MAD z-score -- z <= -warn_z -> WARN, z <= -fail_z -> FAIL.
-    Related to R-PRE-FLAT (shares q3); weight if using combine_mode=weighted.
-    Params: warn_z (default 3), fail_z (default 5)."""
+    """邊緣訊雜比：edge_step / q3_pre_flatness（兩者皆為原始 μ 單位 → 無因次）。
+    低 SNR 為壞事，故採單側「下尾」MAD z-score —
+    z ≤ −warn_z → WARN，z ≤ −fail_z → FAIL。
+    與 R-PRE-FLAT 相關（共用 q3）；若使用 combine_mode=weighted 時應調整權重。
+    參數：warn_z（預設 3）、fail_z（預設 5）。"""
     step = cell.meta.get("edge_step")
     q3 = cell.meta.get("q3_pre_flatness")
     if step is None or q3 is None or q3 <= 0:
@@ -285,12 +282,12 @@ def _r_snr(ctx, cell, params) -> RuleResult:
 @rule("C-SHAPE", flag="consistent", scope="grid",
       requires=("GATE-EDGE", "CAL-EREF"))
 def _c_shape(ctx, cell, params) -> RuleResult:
-    """R-factor of this cell's corrected `norm` versus the pointwise median
-    of all gate+cal-passing cells, both interpolated onto a common energy
-    grid ([E0_med + shape_grid_eV[0], E0_med + shape_grid_eV[1]] at
-    shape_grid_eV[2] step, from config.examine). One-sided upper MAD
-    z-score. Cells whose energy range doesn't cover the common grid
-    return N/A. Params: warn_z (default 3), fail_z (default 5)."""
+    """本格經校正的 norm 對「所有通過 gate + cal-eref 格子的逐點中位數」做 R-factor，
+    兩者皆內插到共同能量網格
+    ([E0_med + shape_grid_eV[0], E0_med + shape_grid_eV[1]]、
+    步長 shape_grid_eV[2]，取自 config.examine）。單側上尾 MAD z-score。
+    能量範圍未涵蓋共同網格的格子回傳 N/A。
+    參數：warn_z（預設 3）、fail_z（預設 5）。"""
     r = ctx.shape_r.get(cell.key)
     if r is None:
         return RuleResult(None, None, "no shape residual (excluded from median)")
@@ -300,12 +297,11 @@ def _c_shape(ctx, cell, params) -> RuleResult:
 @rule("C-E0-NBR", flag="consistent", scope="grid",
       requires=("GATE-EDGE", "CAL-EREF"))
 def _c_e0_nbr(ctx, cell, params) -> RuleResult:
-    """Corrected E0 versus the median of the 8-neighbour corrected E0s.
-    Two-sided MAD z-score (both too-high and too-low are anomalies).
-    Cells with fewer than 2 valid neighbours return N/A. Because a hit
-    here can be real chemistry (different oxidation state at that spot),
-    it flags `consistent` -- doesn't kill `usable`. Params: warn_z (3),
-    fail_z (5)."""
+    """校正後 E₀ 與 8 鄰格校正後 E₀ 中位數之差。雙側 MAD z-score
+    （過高與過低都算異常）。有效鄰格少於 2 個 → N/A。
+    此規則若命中可能是真實化學差異（該點氧化態不同），
+    所以只影響 `consistent` 旗標，不影響 `usable`。
+    參數：warn_z（預設 3）、fail_z（預設 5）。"""
     d = ctx.e0_nbr_diff.get(cell.key)
     if d is None:
         return RuleResult(None, None, "<2 valid neighbors")
@@ -315,10 +311,10 @@ def _c_e0_nbr(ctx, cell, params) -> RuleResult:
 @rule("C-CUMDIFF", flag="consistent", scope="grid",
       requires=("GATE-EDGE", "CAL-EREF"))
 def _c_cumdiff(ctx, cell, params) -> RuleResult:
-    """Lippold 2005 criterion 7 applied vs the mean of 8-neighbour corrected
-    norms on the common energy grid. Requires the shape context (interpolated
-    norms) — cells that could not be interpolated onto the common grid, or
-    have fewer than 2 valid neighbours there, return N/A."""
+    """Lippold 2005 判準 7，參考採 8 鄰格「校正後 norm」於共同網格上的平均值。
+    需要 shape context（各格內插到共同網格的 norm）— 無法內插到共同網格、
+    或於共同網格上有效鄰格少於 2 個的格子，回傳 N/A。
+    參數：warn_z（預設 3）、fail_z（預設 5）；預設 enabled: false。"""
     v = ctx.cumdiff_c7.get(cell.key)
     if v is None:
         return RuleResult(None, None,

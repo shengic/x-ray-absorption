@@ -15,7 +15,7 @@ Cache:
 Batch mode (no GUI):
     python main.py --batch image_AI_Ni
 
-version 1.5 by Albert Sheng
+version 1.6 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -646,6 +646,30 @@ class XANESViewer:
         lbl.bind("<Button-1>", lambda _e: on_click())
         return lbl
 
+    def _open_help_window(self, title: str, body: str):
+        """Non-modal help panel with a Close button. Multiple can coexist;
+        does not block the main window (no grab, no wait_window)."""
+        win = tk.Toplevel(self.root)
+        win.title(title)
+        win.geometry("560x360")
+        frame = ttk.Frame(win, padding=8)
+        frame.pack(fill=tk.BOTH, expand=True)
+        text = tk.Text(frame, wrap="word",
+                       font=("TkDefaultFont", 10), height=15,
+                       padx=6, pady=4)
+        scroll = ttk.Scrollbar(frame, orient="vertical",
+                               command=text.yview)
+        text.configure(yscrollcommand=scroll.set)
+        scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        text.insert("1.0", body)
+        text.configure(state="disabled")
+        footer = ttk.Frame(win, padding=(8, 4))
+        footer.pack(fill=tk.X, side=tk.BOTTOM)
+        ttk.Button(footer, text="關閉 (Close)",
+                   command=win.destroy).pack(side=tk.RIGHT)
+        win.transient(self.root)
+
     def _show_rule_help(self, rid: str):
         import inspect
         try:
@@ -655,22 +679,24 @@ class XANESViewer:
             return
         r = rl.REGISTRY.get(rid)
         if r is None:
-            messagebox.showinfo(f"Help — {rid}", "(rule not registered)")
+            self._open_help_window(f"說明 — {rid}", "（此規則未註冊）")
             return
-        doc = inspect.getdoc(r.fn) or "(no description available)"
-        req = ", ".join(r.requires) if r.requires else "(none)"
-        messagebox.showinfo(
-            f"Help — {rid}",
-            f"Rule:     {rid}\n"
-            f"Flag:     {r.flag}\n"
-            f"Scope:    {r.scope}\n"
-            f"Requires: {req}\n\n"
+        doc = inspect.getdoc(r.fn) or "（尚無描述）"
+        req = ", ".join(r.requires) if r.requires else "（無）"
+        body = (
+            f"規則：     {rid}\n"
+            f"旗標：     {r.flag}\n"
+            f"作用範圍： {r.scope}\n"
+            f"依賴規則： {req}\n"
+            f"{'─' * 40}\n\n"
             f"{doc}"
         )
+        self._open_help_window(f"說明 — {rid}", body)
 
     def _show_edge_help(self, key: str):
-        msg = self.EDGE_HELP.get(key, "(no description available)")
-        messagebox.showinfo(f"Help — {key}", msg)
+        msg = self.EDGE_HELP.get(key, "（尚無描述）")
+        body = f"欄位：{key}\n{'─' * 40}\n\n{msg}"
+        self._open_help_window(f"說明 — {key}", body)
 
     def _build_rules_tab(self, parent, cfg, rl):
         header = ttk.Frame(parent, padding=6)
@@ -682,9 +708,9 @@ class XANESViewer:
         ).pack(anchor=tk.W)
         body = ttk.Frame(parent, padding=6)
         body.pack(fill=tk.BOTH, expand=True)
-        ttk.Label(body, text="Rule (click for help)",
+        ttk.Label(body, text="Rule（點名稱看說明）",
                   font=("TkDefaultFont", 9, "bold"),
-                  width=22).grid(row=0, column=0, sticky=tk.W)
+                  width=24).grid(row=0, column=0, sticky=tk.W)
         ttk.Label(body, text="On", font=("TkDefaultFont", 9, "bold")
                   ).grid(row=0, column=1)
         ttk.Label(body, text="Flag", font=("TkDefaultFont", 9, "bold")
@@ -904,35 +930,31 @@ class XANESViewer:
     )
 
     EDGE_HELP = {
-        "element": "Chemical symbol of the absorber (e.g. 'Ni'). Used for "
-                   "reference lookups; not currently consumed by any rule.",
-        "edge":    "Absorption edge letter (K, L1, L2, L3). Ni K nominal "
-                   "= 8333 eV. Documented for traceability.",
+        "element":
+            "吸收元素的化學符號（例：'Ni'）。用於參考查詢；目前無規則直接使用。",
+        "edge":
+            "吸收邊代號（K、L1、L2、L3）。Ni K 標稱值 = 8333 eV。留作追溯用。",
         "e0_nominal_eV":
-            "Reference nominal edge energy (eV). CAL-EREF's L1 check "
-            "requires mu_ref_e0 - e0_nominal_eV to lie inside "
-            "mono_offset_window_eV. Ni K default = 8333.0.",
+            "參考標稱邊能（eV）。CAL-EREF 的 L1 檢查要求\n"
+            "  mu_ref_e0 − e0_nominal_eV\n"
+            "落在 mono_offset_window_eV 內。Ni K 預設 = 8333.0。",
         "e0_alt_eV":
-            "Alternative nominal from the beamline Info.txt "
-            "(8331.90 for this dataset). Documented so the ~1.1 eV "
-            "gap between the two nominals is explicit; use "
-            "e0_nominal_tol_eV to cover the gap.",
+            "來自光束線 Info.txt 的替代標稱值（本資料 = 8331.90）。\n"
+            "列於此讓 8333 與 8331.90 之間 1.1 eV 的差距透明化；\n"
+            "用 e0_nominal_tol_eV 涵蓋這段差距。",
         "e0_nominal_tol_eV":
-            "L2 tolerance (eV): |E0_ref_calibrated - e0_nominal_eV| "
-            "should stay below this value. Set >= 1.5 to cover the "
-            "8333 vs 8331.9 gap.",
+            "L2 容差（eV）：|E0_ref_calibrated − e0_nominal_eV| 應小於此值。\n"
+            "建議設 ≥ 1.5，以涵蓋 8333 與 8331.9 之間的差距。",
         "mono_offset_window_eV":
-            "L1 window [low, high] eV for mu_ref_e0 - e0_nominal_eV. "
-            "Wide default [-5, 25] permits the ~+13 eV monochromator-scale "
-            "offset observed in this dataset. Out-of-window -> CAL-EREF FAIL.",
+            "L1 窗 [low, high]（eV），套用於 mu_ref_e0 − e0_nominal_eV。\n"
+            "預設寬 [-5, 25] 涵蓋此資料集約 +13 eV 的單色器刻度偏差。\n"
+            "超窗 → CAL-EREF FAIL。",
         "ref_e0_search_eV":
-            "Window [low, high] eV where find_e0 searches for the "
-            "reference edge on mu_ref. Should straddle the true "
-            "reference E0 and avoid known pre-edge glitches.",
+            "find_e0 於 mu_ref 通道搜尋邊能的區間 [low, high]（eV）。\n"
+            "應涵蓋真實參考 E₀，並避開已知的 pre-edge glitch。",
         "ref_e0_spread_tol_eV":
-            "L3 tolerance (eV): |mu_ref_e0[k] - median(mu_ref_e0)|. "
-            "The reference foil E0 should be a constant across all "
-            "121 cells; a value above this suggests row-to-row drift.",
+            "L3 容差（eV）：|mu_ref_e0[k] − median(mu_ref_e0)|。\n"
+            "參考箔 E₀ 在 121 格應為常數，超過此值代表列間漂移。",
     }
 
 

@@ -1,4 +1,4 @@
-<!-- README.md | version 2.0.6 by Albert Sheng | Config panel: rule + edge names are clickable help links -->
+<!-- README.md | version 2.0.7 by Albert Sheng | Config help: non-modal 繁中 panels -->
 
 # NiXZ-121 XANES Analyzer
 
@@ -74,7 +74,7 @@ On launch, pick the dataset root (folder containing
 | **Both plots (combined)** button | open the side-by-side combined figure |
 | **Process all (batch)** | run pipeline on all 121, progress bar fills |
 | **Examine 121** | rule-based verdict over all cached cells |
-| **Config...** | tabbed editor: **Rules** tab (toggle + params) and **Edge** tab (`edge.*` — Ni K nominal E₀, mu_ref windows, tolerances). Every rule and edge-field name is a **clickable help link** that pops up an explanation (rule docstring or curated description). Shared "Save to config.yaml" + "Apply & Examine". |
+| **Config...** | tabbed editor: **Rules** tab (toggle + params) and **Edge** tab (`edge.*` — Ni K nominal E₀, mu_ref windows, tolerances). Every rule and edge-field name is a **clickable help link** — opens a **non-modal Toplevel** (main window stays interactive) with a scrollable Traditional-Chinese description and a Close button. Shared "Save to config.yaml" + "Apply & Examine". |
 | **11 × 11 heatmap** | color by raw metric or examine flag (PASS/WARN/FAIL/N/A) |
 | **Rule violations** | small-multiples: one 11 × 11 per rule |
 | click any heatmap cell | jump-select the section in the listboxes |
