@@ -1,4 +1,4 @@
-<!-- README.md | version 2.0.4 by Albert Sheng | + Edge/calibration GUI editor -->
+<!-- README.md | version 2.0.5 by Albert Sheng | Rules + Edge consolidated into Config... panel -->
 
 # NiXZ-121 XANES Analyzer
 
@@ -74,8 +74,7 @@ On launch, pick the dataset root (folder containing
 | **Both plots (combined)** button | open the side-by-side combined figure |
 | **Process all (batch)** | run pipeline on all 121, progress bar fills |
 | **Examine 121** | rule-based verdict over all cached cells |
-| **Rules...** | toggle rules, edit z-score thresholds, Apply & Examine |
-| **Edge...** | edit `config.yaml` `edge.*` (Ni K nominal E₀, mu_ref windows, tolerances), Apply & Examine |
+| **Config...** | tabbed editor: **Rules** tab (toggle + params) and **Edge** tab (`edge.*` — Ni K nominal E₀, mu_ref windows, tolerances). Shared "Save to config.yaml" + "Apply & Examine". |
 | **11 × 11 heatmap** | color by raw metric or examine flag (PASS/WARN/FAIL/N/A) |
 | **Rule violations** | small-multiples: one 11 × 11 per rule |
 | click any heatmap cell | jump-select the section in the listboxes |
