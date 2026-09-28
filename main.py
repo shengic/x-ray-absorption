@@ -15,7 +15,7 @@ Cache:
 Batch mode (no GUI):
     python main.py --batch image_AI_Ni
 
-version 1.9 by Albert Sheng
+version 1.10 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -56,6 +56,7 @@ class XANESViewer:
         self.heatmap_window: tk.Toplevel | None = None
         self.config_window: tk.Toplevel | None = None
         self.rule_violations_window: tk.Toplevel | None = None
+        self.examine_results_window: tk.Toplevel | None = None
         self.edge_vars: dict[str, object] = {}
         self.config_save_var: tk.BooleanVar | None = None
         self.config: dict | None = None
@@ -307,7 +308,8 @@ class XANESViewer:
             except tk.TclError:
                 pass
             self.heatmap_window = None
-        for attr in ("config_window", "rule_violations_window"):
+        for attr in ("config_window", "rule_violations_window",
+                     "examine_results_window"):
             w = getattr(self, attr, None)
             if w is not None:
                 try:
@@ -597,6 +599,91 @@ class XANESViewer:
         if (self.heatmap_window is not None
                 and self.heatmap_window.winfo_exists()):
             self.show_heatmap()
+        self._open_examine_results(run)
+
+    def _open_examine_results(self, run) -> None:
+        """Singleton panel summarising the latest Examine run: usable count,
+        flag breakdowns, per-rule WARN/FAIL/N/A tallies. Non-modal."""
+        from collections import Counter
+
+        n = run.n_cells
+        if n == 0:
+            return
+        verdicts = list(run.verdicts.values())
+        n_usable = sum(1 for v in verdicts if v["usable"])
+        smooth = Counter(v.get("smooth", "N/A") for v in verdicts)
+        consistent = Counter(v.get("consistent", "N/A") for v in verdicts)
+
+        rule_ids = list(verdicts[0].get("rules", {}).keys()) if verdicts else []
+        rule_counts: dict[str, Counter] = {rid: Counter() for rid in rule_ids}
+        for v in verdicts:
+            for rid, r in v.get("rules", {}).items():
+                rule_counts[rid][r.get("level_name", "N/A")] += 1
+
+        def _bar(count: int, total: int, width: int = 30) -> str:
+            return "█" * max(0, (count * width) // max(1, total))
+
+        lines: list[str] = []
+        lines.append(f"Run ID:    {run.run_id}")
+        lines.append(f"Computed:  {run.computed_at}")
+        lines.append(f"Cells:     {n}")
+        lines.append("")
+        lines.append(f"Usable / 可用:  {n_usable} / {n}   "
+                     f"({n_usable / n * 100:.1f}%)")
+        lines.append("")
+        for label_en, label_zh, counts in (
+            ("smooth", "平滑度", smooth),
+            ("consistent", "一致性", consistent),
+        ):
+            lines.append(f"{label_en} / {label_zh}:")
+            for level in ("PASS", "WARN", "FAIL", "N/A"):
+                c = counts.get(level, 0)
+                lines.append(f"  {level:<5} {c:4d}   {_bar(c, n)}")
+            lines.append("")
+
+        lines.append("Per-rule tally / 各規則計數:")
+        if rule_ids:
+            max_id = max(len(rid) for rid in rule_ids)
+            header = (f"  {'rule':<{max_id}}   PASS  WARN  FAIL   N/A")
+            lines.append(header)
+            lines.append("  " + "─" * (len(header) - 2))
+            for rid in rule_ids:
+                c = rule_counts[rid]
+                lines.append(
+                    f"  {rid:<{max_id}}   "
+                    f"{c.get('PASS', 0):4d}  "
+                    f"{c.get('WARN', 0):4d}  "
+                    f"{c.get('FAIL', 0):4d}  "
+                    f"{c.get('N/A', 0):4d}"
+                )
+        body = "\n".join(lines)
+
+        win = self.examine_results_window
+        if win is None or not win.winfo_exists():
+            win = tk.Toplevel(self.root)
+            self.examine_results_window = win
+        else:
+            for c in win.winfo_children():
+                c.destroy()
+        win.title(f"Examine 121 — {n_usable}/{n} usable")
+        win.geometry("600x600")
+
+        text = tk.Text(win, wrap="none", font=("Consolas", 10),
+                       padx=10, pady=8)
+        text.pack(fill=tk.BOTH, expand=True)
+        text.insert("1.0", body)
+        text.configure(state="disabled")
+
+        footer = ttk.Frame(win, padding=(8, 4))
+        footer.pack(fill=tk.X, side=tk.BOTTOM)
+        ttk.Button(footer, text="關閉 (Close)",
+                   command=win.destroy).pack(side=tk.RIGHT)
+        ttk.Button(footer, text="Rule violations",
+                   command=self.show_rule_violations).pack(side=tk.RIGHT, padx=6)
+        ttk.Button(footer, text="11×11 heatmap",
+                   command=self.show_heatmap).pack(side=tk.RIGHT, padx=6)
+        win.transient(self.root)
+        win.lift()
 
     def show_config_panel(self):
         """Unified config editor: Rules and Edge tabs, one Apply, one Save."""

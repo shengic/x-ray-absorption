@@ -1,4 +1,4 @@
-<!-- status.md | version 1.10 by Albert Sheng | 2026-09-28 | Choose root... 對話框預設在專案根目錄 -->
+<!-- status.md | version 1.11 by Albert Sheng | 2026-09-28 | Examine 121 完成後自動彈出結果摘要面板 -->
 # NiXZ-121 XANES Viewer — 專案狀態
 
 最後更新：2026-09-27 18:30（UTC+8）　依據：commit `9765ac6`（2026-09-27 06:52）與工作目錄現況
@@ -16,7 +16,7 @@
 | `doc/status.md` | 1.3 |
 | `CLAUDE.md` | 1.1 |
 | `README.md` | 2.0.3 |
-| `main.py` | 1.9 |
+| `main.py` | 1.10 |
 | `pipeline.py` | 1.3 |
 | `rules.py` | 1.3.1 |
 | `examine.py` | 1.2.0 |
@@ -93,6 +93,7 @@
 
 | 版本 | 日期 | 內容 |
 |---|---|---|
+| 1.11 | 2026-09-28 | main.py v1.10：`Examine 121` 完成後自動開一個**單例 Toplevel 結果面板**顯示：run_id、computed_at、cells 總數、usable 分子/分母/%、smooth 與 consistent 的 PASS/WARN/FAIL/N/A 分佈（含 ASCII bar chart）、每條規則的 PASS/WARN/FAIL/N/A tally。附「Rule violations」「11×11 heatmap」「關閉」三個按鈕。字型用 Consolas 10pt 配合表格對齊；`transient(root)` 非阻塞。狀態列的一行摘要保留。 |
 | 1.10 | 2026-09-28 | main.py v1.9：`Choose root...` 對話框預設 `initialdir = 專案根目錄`（`Path(__file__).resolve().parent`），不再自動潛入 `image_AI_Ni`。已選過 root 之後，下次點會回到「上次 root 的父目錄」方便挑 sibling 資料夾。 |
 | 1.9 | 2026-09-28 | main.py v1.8：help panel 中英**混排**。ASCII 用 Georgia，中文用**標楷體**（DFKai-SB kaishu，於 Windows 中文區域以 `標楷體` 中文名註冊），透過 Tk Text 的 tag 依 script 切換字型；neutral（數字/空白/標點）繼承上下文，不會 mid-word 跳字型。字級 12pt，視窗 620×400，行距 spacing1/3=3。 |
 | 1.8 | 2026-09-28 | main.py v1.7：help 面板改用 **Microsoft JhengHei UI 11pt**（Windows 8+ 官方繁中 UI 字型），自動偵測並 fallback 到 Noto Sans TC / PingFang TC / PMingLiU / TkDefaultFont。行距微調（spacing1/3=2）與內距 8/6 讓中文更好讀。 |
