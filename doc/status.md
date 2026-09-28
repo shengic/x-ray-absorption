@@ -1,4 +1,4 @@
-<!-- status.md | version 1.9 by Albert Sheng | 2026-09-28 | help panel 中英混排：英 Georgia + 中 標楷體 -->
+<!-- status.md | version 1.10 by Albert Sheng | 2026-09-28 | Choose root... 對話框預設在專案根目錄 -->
 # NiXZ-121 XANES Viewer — 專案狀態
 
 最後更新：2026-09-27 18:30（UTC+8）　依據：commit `9765ac6`（2026-09-27 06:52）與工作目錄現況
@@ -16,7 +16,7 @@
 | `doc/status.md` | 1.3 |
 | `CLAUDE.md` | 1.1 |
 | `README.md` | 2.0.3 |
-| `main.py` | 1.8 |
+| `main.py` | 1.9 |
 | `pipeline.py` | 1.3 |
 | `rules.py` | 1.3.1 |
 | `examine.py` | 1.2.0 |
@@ -93,6 +93,7 @@
 
 | 版本 | 日期 | 內容 |
 |---|---|---|
+| 1.10 | 2026-09-28 | main.py v1.9：`Choose root...` 對話框預設 `initialdir = 專案根目錄`（`Path(__file__).resolve().parent`），不再自動潛入 `image_AI_Ni`。已選過 root 之後，下次點會回到「上次 root 的父目錄」方便挑 sibling 資料夾。 |
 | 1.9 | 2026-09-28 | main.py v1.8：help panel 中英**混排**。ASCII 用 Georgia，中文用**標楷體**（DFKai-SB kaishu，於 Windows 中文區域以 `標楷體` 中文名註冊），透過 Tk Text 的 tag 依 script 切換字型；neutral（數字/空白/標點）繼承上下文，不會 mid-word 跳字型。字級 12pt，視窗 620×400，行距 spacing1/3=3。 |
 | 1.8 | 2026-09-28 | main.py v1.7：help 面板改用 **Microsoft JhengHei UI 11pt**（Windows 8+ 官方繁中 UI 字型），自動偵測並 fallback 到 Noto Sans TC / PingFang TC / PMingLiU / TkDefaultFont。行距微調（spacing1/3=2）與內距 8/6 讓中文更好讀。 |
 | 1.7 | 2026-09-28 | main.py v1.6 / rules.py v1.3.1：說明面板改為**非阻塞** Toplevel（可捲動 Text + 關閉按鈕，不搶焦點、可並開）。所有規則 docstring 與 EDGE_HELP 字典**翻譯為繁體中文**。83/83 tests |

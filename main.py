@@ -15,7 +15,7 @@ Cache:
 Batch mode (no GUI):
     python main.py --batch image_AI_Ni
 
-version 1.8 by Albert Sheng
+version 1.9 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -158,10 +158,19 @@ class XANESViewer:
         self.root.destroy()
 
     def pick_root(self):
-        default = "image_AI_Ni" if Path("image_AI_Ni").is_dir() else "."
+        # Anchor dialog to the project root (directory containing main.py) so
+        # the user sees siblings like image_AI_Ni, data/, image/ at once,
+        # regardless of the shell's current working directory.
+        project_root = Path(__file__).resolve().parent
+        # After the first pick, prefer the parent of the previously chosen
+        # dataset root so you can pick a sibling folder easily.
+        if self.dataset_root is not None:
+            initialdir = str(self.dataset_root.parent)
+        else:
+            initialdir = str(project_root)
         d = filedialog.askdirectory(
             title="Choose dataset root (contains Z*/X*_XANES.txt)",
-            initialdir=default,
+            initialdir=initialdir,
         )
         if not d:
             return
