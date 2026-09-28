@@ -1,4 +1,4 @@
-# config.yaml | version 1.2.0 by Albert Sheng
+# config.yaml | version 1.2.1 by Albert Sheng | GATE-EDGE 由 121 分佈驗證（D8 結案）
 # NiXZ-121 examine rules & thresholds.
 # All numeric values are starting seeds, NOT literature standards.
 # Program must not hard-code thresholds elsewhere; edit this file (or use the
@@ -21,6 +21,13 @@ examine:
   shape_grid_eV: [-30.0, 150.0, 0.3]   # relative to median E0: start, end, step
 
 rules:
+  # GATE-EDGE calibrated from 121-cell distribution (2026-09-28, D8 closed):
+  # median=0.345, MAD*1.4826=0.167, range [0.043, 0.929]. Bimodal — 11 cells
+  # cluster at [0.04, 0.07] (off-sample edge pixels), gap at [0.10, 0.13],
+  # 110 real cells at [0.13, 0.93]. Lower 0.10 sits in the natural gap.
+  # Upper 1.5 leaves headroom for thicker future samples (current max 0.93).
+  # Gaur 2026 [0.5, 2.0] is for bulk single-spectrum QC, not for mapping
+  # where off-sample pixels are expected. See doc/NiXZ-121_project.md §10 D8.
   GATE-EDGE:  {enabled: true,  min: 0.10, max: 1.5}
   CAL-EREF:   {enabled: true}
   R-SNR:      {enabled: true,  warn_z: 3, fail_z: 5}

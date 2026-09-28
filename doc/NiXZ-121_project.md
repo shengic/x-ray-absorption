@@ -1,4 +1,4 @@
-<!-- NiXZ-121_project.md | version 1.4.2 by Albert Sheng | 2026-09-27 | D9 已結案（FNAME_RE 加 IGNORECASE，validate_root 完整性檢查）-->
+<!-- NiXZ-121_project.md | version 1.4.3 by Albert Sheng | 2026-09-28 | D8 已結案（GATE-EDGE 由 121 格 edge_step 分佈驗證）-->
 
 # NiXZ-121 XANES 區段品質分析 — 專案整合文件
 
@@ -379,7 +379,7 @@ GUI
 | D5 | 2026-09-26 | 資料庫選型 | 原 guideline §6 寫 MySQL、§8 寫 SQLite | 架構 | 使用者決定採用 MySQL（§6） | 結案 |
 | D6 | 2026-09-26 | 單色器能量刻度 | 樣品與 mu_ref 的 E₀ 都比標稱值高約 +13 eV | 若未校正，跨區段或與文獻比較時會誤判為化學位移 | 流程中強制先以 mu_ref 校正（§4 步驟 4）；L1 窗監控偏差 | 處置中 |
 | D7 | 2026-09-26 | 指標編號：文件 vs 程式 | `main.py` v1.0：Q1 = edge_step 原值、Q5 = glitches、Q6 = white line，無形狀相似度。本文件 §5.2：Q1 = Δμ₀/σ_pre、Q1b = Δμ₀、Q5 = 形狀 R、Q6 = glitch、Q7 = white line | GUI 與文件、資料庫欄位名稱不一致 | 以程式現有編號為準，新增指標另給名稱（snr、shape_R、dE0_nbr），文件下版對齊 | 開放 |
-| D8 | 2026-09-26 | GATE-EDGE 門檻 vs 文獻 | 本專案 Δμ₀ ∈ [0.1, 1.5]；Gaur et al. 2026 穿透模式建議 0.5–2.0。首件 Δμ₀ = 0.565 位於其下限附近 | 下限：Gaur 標準為量測設計用，mapping 中 GATE 用於排除未打到樣品的格子，可較寬；上限 1.5 可能過嚴 | 保留 [0.1, 1.5] 為起始值；Examine 121 格後依 Δμ₀ 分佈與目視對照重新決定 | 開放 |
+| D8 | 2026-09-26 | GATE-EDGE 門檻 vs 文獻 | 本專案 Δμ₀ ∈ [0.1, 1.5]；Gaur et al. 2026 穿透模式建議 0.5–2.0。首件 Δμ₀ = 0.565 位於其下限附近 | 下限：Gaur 標準為量測設計用，mapping 中 GATE 用於排除未打到樣品的格子，可較寬；上限 1.5 可能過嚴 | 保留 [0.1, 1.5] 為起始值；Examine 121 格後依 Δμ₀ 分佈與目視對照重新決定 | **結案（2026-09-28）**：121 格分佈統計：n=121, min=0.043, max=0.929, median=0.345, MAD·1.4826=0.167；分佈**雙峰** — 6 格於 [0.04, 0.06]（近零訊號）、2 格於 [0.10, 0.13]、110 格於 [0.13, 0.93]；[0.099, 0.131) 為天然分界間隙。現行 [0.10, 1.5] 判 110/121 (90.9%) pass，11 個 FAIL 全部位於 X10_-5 欄（x=−5）或角落，為樣品幾何最左邊。Gaur [0.5, 2.0] 對此資料判 102/121 FAIL（Gaur 為 bulk 單光譜設計，不適用有 off-sample 像素的 mapping）。**現行閾值由資料驗證保留**，config.yaml 註記出處 |
 | D9 | 2026-09-27 | 檔名大小寫 | `image_AI_Ni/Z6_1/x5_0_666_786_XANES.txt` 以小寫 `x` 開頭；`pipeline.FNAME_RE = ^X(\d+)_…` 大小寫敏感。Windows 上 `glob("X*_XANES.txt")` 不分大小寫會列出此檔，再被 regex 濾除，無警告 | 中心列 (x, z) = (0, +1) 缺格：`data/` 只有 120/121 格；熱圖該格為空；C-E0-NBR、C-CUMDIFF 的鄰格數受影響 | `pipeline.py` v1.3：`FNAME_RE` 加 `re.IGNORECASE`；`discover_x_files` 改用 `glob("*_XANES.txt")`；新增 `validate_root()` 回傳 ValidationReport（Z 數、每 Z 檔數、被 regex 濾除的檔名），`run_batch` 與 GUI `_populate_z` 都會呼叫；`main.py._select_cell_by_xz` 前綴比對改為 case-insensitive。原始檔不改名 | 結案（2026-09-27）：`--batch` 現產出 121/121 sections, 0 errors；83/83 tests |
 
 新差異一律附加在本表末尾，ID 遞增，不刪除舊紀錄；結案時更新狀態欄並註明依據。
@@ -390,6 +390,7 @@ GUI
 
 | 版本 | 日期 | 內容 |
 |---|---|---|
+| 1.4.3 | 2026-09-28 | D8 結案：以 121 格 edge_step 實測分佈驗證 GATE-EDGE `[0.10, 1.5]`。分佈雙峰，天然分界在 0.10，110/121 (90.9%) pass；11 FAIL 全落在樣品幾何邊緣。Gaur [0.5, 2.0] 對本資料判 15.7% pass，證實 mapping 場景不能沿用 bulk 標準。config.yaml v1.2.1 加註出處註解 |
 | 1.4.2 | 2026-09-27 | CLI 端：修正 D9。`pipeline.py` v1.3：`FNAME_RE` 加 `re.IGNORECASE`、新增 `validate_root()` + `ValidationReport`、`EXPECTED_Z_COUNT/EXPECTED_X_PER_Z` 常數；`main.py` v1.2：`run_batch` 印出 validate 報告、`_populate_z` 顯示完整性、`_select_cell_by_xz` case-insensitive。4 新測試（83/83）。`--batch` 重跑產出 121/121 sections, 0 errors，Examine 121 cells, 76 usable。D9 狀態 → 結案 |
 | 1.4.1 | 2026-09-27 | by Albert Sheng。§10 新增 D9（Z6_1 中心格檔名小寫被無聲略過，120/121）；D2 改為已釐清；新增 `doc/status.md` |
 | 1.4.0 | 2026-09-27 | CLI 端：實作 `R-EDGE-FWHM`（Gaur 2026 導數峰寬 → grid-relative 雙側 z）與 `R-NORM-COEFS`（§5.2 A Q3：pre_slope + norm_c1 + norm_c2 之 max\|z\|）；`pipeline.py` 一併持久化 `edge_fwhm_eV`、`pre_slope`、`norm_c0/1/2`；config 兩條 `enabled: true`；6 新測試（79/79 全通過）；§5.1.1 補兩列 |
