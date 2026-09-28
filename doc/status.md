@@ -1,4 +1,4 @@
-<!-- status.md | version 1.7 by Albert Sheng | 2026-09-28 | help panels 改為非阻塞 Toplevel，說明改繁中 -->
+<!-- status.md | version 1.8 by Albert Sheng | 2026-09-28 | help panel 改用 Microsoft JhengHei UI 11pt -->
 # NiXZ-121 XANES Viewer — 專案狀態
 
 最後更新：2026-09-27 18:30（UTC+8）　依據：commit `9765ac6`（2026-09-27 06:52）與工作目錄現況
@@ -16,7 +16,7 @@
 | `doc/status.md` | 1.3 |
 | `CLAUDE.md` | 1.1 |
 | `README.md` | 2.0.3 |
-| `main.py` | 1.6 |
+| `main.py` | 1.7 |
 | `pipeline.py` | 1.3 |
 | `rules.py` | 1.3.1 |
 | `examine.py` | 1.2.0 |
@@ -93,6 +93,7 @@
 
 | 版本 | 日期 | 內容 |
 |---|---|---|
+| 1.8 | 2026-09-28 | main.py v1.7：help 面板改用 **Microsoft JhengHei UI 11pt**（Windows 8+ 官方繁中 UI 字型），自動偵測並 fallback 到 Noto Sans TC / PingFang TC / PMingLiU / TkDefaultFont。行距微調（spacing1/3=2）與內距 8/6 讓中文更好讀。 |
 | 1.7 | 2026-09-28 | main.py v1.6 / rules.py v1.3.1：說明面板改為**非阻塞** Toplevel（可捲動 Text + 關閉按鈕，不搶焦點、可並開）。所有規則 docstring 與 EDGE_HELP 字典**翻譯為繁體中文**。83/83 tests |
 | 1.6 | 2026-09-28 | main.py v1.5 / rules.py v1.3.0：Config 面板加 clickable help links。規則名稱點擊 → flag/scope/requires + rule fn docstring；edge 欄位名稱點擊 → curated EDGE_HELP 字典說明。補齊 7 條缺 docstring 的規則（GATE-EDGE、CAL-EREF、R-NOISE-HF、R-PRE-FLAT、R-GLITCH、R-SNR、C-SHAPE、C-E0-NBR）。83/83 tests |
 | 1.5 | 2026-09-28 | main.py v1.4：`Rules...` + `Edge...` 合併為 `Config...` 分頁面板（ttk.Notebook）。共用 footer（Save + Apply + Close），一次 Apply 同步兩區並只跑一次 Examine。刪除 4 個舊方法與 2 個狀態欄位，程式淨減 ~30 行。83/83 tests |

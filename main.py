@@ -15,7 +15,7 @@ Cache:
 Batch mode (no GUI):
     python main.py --batch image_AI_Ni
 
-version 1.6 by Albert Sheng
+version 1.7 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -646,17 +646,38 @@ class XANESViewer:
         lbl.bind("<Button-1>", lambda _e: on_click())
         return lbl
 
+    HELP_FONT_PREFERENCES = (
+        "Microsoft JhengHei UI",   # Windows 8+; modern Traditional Chinese UI
+        "Microsoft JhengHei",       # Windows Vista+; slightly wider metrics
+        "PingFang TC",              # macOS Traditional Chinese
+        "Noto Sans TC",             # Linux
+        "PMingLiU",                 # very old Windows fallback
+    )
+    HELP_FONT_SIZE = 11
+
+    def _help_font(self):
+        """Pick the first available preferred font, or fall back to
+        TkDefaultFont. Returns a (family, size) tuple ready for tk widgets."""
+        from tkinter import font as tkfont
+        available = set(tkfont.families(root=self.root))
+        for family in self.HELP_FONT_PREFERENCES:
+            if family in available:
+                return (family, self.HELP_FONT_SIZE)
+        return ("TkDefaultFont", self.HELP_FONT_SIZE)
+
     def _open_help_window(self, title: str, body: str):
         """Non-modal help panel with a Close button. Multiple can coexist;
-        does not block the main window (no grab, no wait_window)."""
+        does not block the main window (no grab, no wait_window). Body
+        uses a Traditional-Chinese-friendly UI font (Microsoft JhengHei UI
+        on Windows) with automatic fallback."""
         win = tk.Toplevel(self.root)
         win.title(title)
-        win.geometry("560x360")
+        win.geometry("580x380")
         frame = ttk.Frame(win, padding=8)
         frame.pack(fill=tk.BOTH, expand=True)
         text = tk.Text(frame, wrap="word",
-                       font=("TkDefaultFont", 10), height=15,
-                       padx=6, pady=4)
+                       font=self._help_font(), height=15,
+                       padx=8, pady=6, spacing1=2, spacing3=2)
         scroll = ttk.Scrollbar(frame, orient="vertical",
                                command=text.yview)
         text.configure(yscrollcommand=scroll.set)
