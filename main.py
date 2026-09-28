@@ -15,7 +15,7 @@ Cache:
 Batch mode (no GUI):
     python main.py --batch image_AI_Ni
 
-version 1.2 by Albert Sheng
+version 1.3 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -56,6 +56,9 @@ class XANESViewer:
         self.heatmap_window: tk.Toplevel | None = None
         self.rules_window: tk.Toplevel | None = None
         self.rule_violations_window: tk.Toplevel | None = None
+        self.edge_window: tk.Toplevel | None = None
+        self.edge_vars: dict[str, object] = {}
+        self.edge_save_var: tk.BooleanVar | None = None
         self.config: dict | None = None
         self.heatmap_metric = tk.StringVar(value="edge_step")
         self.rule_enabled_vars: dict[str, tk.BooleanVar] = {}
@@ -87,6 +90,8 @@ class XANESViewer:
                    command=self.show_rule_violations).pack(side=tk.RIGHT, padx=4)
         ttk.Button(top, text="11×11 heatmap",
                    command=self.show_heatmap).pack(side=tk.RIGHT, padx=4)
+        ttk.Button(top, text="Edge...",
+                   command=self.show_edge_panel).pack(side=tk.RIGHT, padx=4)
         ttk.Button(top, text="Rules...",
                    command=self.show_rules_panel).pack(side=tk.RIGHT, padx=4)
         ttk.Button(top, text="Examine 121",
@@ -296,7 +301,7 @@ class XANESViewer:
             except tk.TclError:
                 pass
             self.heatmap_window = None
-        for attr in ("rules_window", "rule_violations_window"):
+        for attr in ("rules_window", "rule_violations_window", "edge_window"):
             w = getattr(self, attr, None)
             if w is not None:
                 try:
@@ -766,6 +771,97 @@ class XANESViewer:
             self._select_cell_by_xz(x_r, z_r)
         canvas.mpl_connect("button_press_event", _on_click)
         win.lift()
+
+    # ---------------- Edge / calibration panel ----------------
+
+    EDGE_KEYS = (
+        "element", "edge",
+        "e0_nominal_eV", "e0_alt_eV", "e0_nominal_tol_eV",
+        "mono_offset_window_eV", "ref_e0_search_eV", "ref_e0_spread_tol_eV",
+    )
+
+    def show_edge_panel(self):
+        cfg = self._ensure_config()
+        if not cfg:
+            return
+        if self.edge_window is not None and self.edge_window.winfo_exists():
+            self.edge_window.lift()
+            return
+        win = tk.Toplevel(self.root)
+        self.edge_window = win
+        win.title("Edge & calibration — config.yaml edge.*")
+        win.geometry("560x360")
+
+        header = ttk.Frame(win, padding=6)
+        header.pack(fill=tk.X, side=tk.TOP)
+        ttk.Label(
+            header,
+            text=("Ni K-edge nominal energy + mu_ref calibration windows. "
+                  "Affects CAL-EREF and every consistent rule (C-SHAPE / "
+                  "C-E0-NBR / C-CUMDIFF); Apply re-runs Examine."),
+            wraplength=520, foreground="#444",
+        ).pack(anchor=tk.W)
+
+        body = ttk.Frame(win, padding=6)
+        body.pack(fill=tk.BOTH, expand=True)
+
+        edge_cfg = cfg.setdefault("edge", {})
+        self.edge_vars = {}
+        for r, key in enumerate(self.EDGE_KEYS):
+            val = edge_cfg.get(key)
+            ttk.Label(body, text=key, anchor=tk.W, width=24).grid(
+                row=r, column=0, sticky=tk.W, pady=2
+            )
+            if isinstance(val, list) and len(val) == 2:
+                v1 = tk.StringVar(value=str(val[0]))
+                v2 = tk.StringVar(value=str(val[1]))
+                row_frame = ttk.Frame(body)
+                row_frame.grid(row=r, column=1, sticky=tk.W)
+                ttk.Label(row_frame, text="[").pack(side=tk.LEFT)
+                ttk.Entry(row_frame, textvariable=v1, width=10).pack(side=tk.LEFT)
+                ttk.Label(row_frame, text=" , ").pack(side=tk.LEFT)
+                ttk.Entry(row_frame, textvariable=v2, width=10).pack(side=tk.LEFT)
+                ttk.Label(row_frame, text="]").pack(side=tk.LEFT)
+                self.edge_vars[key] = (v1, v2)
+            else:
+                v = tk.StringVar(value=str(val) if val is not None else "")
+                ttk.Entry(body, textvariable=v, width=22).grid(
+                    row=r, column=1, sticky=tk.W, padx=6
+                )
+                self.edge_vars[key] = v
+
+        self.edge_save_var = tk.BooleanVar(value=False)
+        footer = ttk.Frame(win, padding=6)
+        footer.pack(fill=tk.X, side=tk.BOTTOM)
+        ttk.Checkbutton(footer, text="Save to config.yaml on Apply",
+                        variable=self.edge_save_var).pack(side=tk.LEFT)
+        ttk.Button(footer, text="Close",
+                   command=win.destroy).pack(side=tk.RIGHT, padx=4)
+        ttk.Button(footer, text="Apply & Examine",
+                   command=self._apply_edge_and_examine).pack(side=tk.RIGHT, padx=4)
+
+    def _apply_edge_and_examine(self):
+        if self.config is None:
+            return
+        edge_cfg = self.config.setdefault("edge", {})
+        for key, var in self.edge_vars.items():
+            if isinstance(var, tuple):
+                edge_cfg[key] = [_coerce(var[0].get().strip()),
+                                 _coerce(var[1].get().strip())]
+            else:
+                edge_cfg[key] = _coerce(var.get().strip())
+        if self.edge_save_var and self.edge_save_var.get():
+            try:
+                import yaml
+                Path("config.yaml").write_text(
+                    yaml.safe_dump(self.config, sort_keys=False,
+                                    allow_unicode=True),
+                    encoding="utf-8",
+                )
+                self.status.set("config.yaml saved")
+            except Exception as e:
+                messagebox.showerror("save config.yaml failed", str(e))
+        self.run_examine_all()
 
     def _apply_rules_and_examine(self):
         if self.config is None:

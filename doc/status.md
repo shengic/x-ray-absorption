@@ -1,4 +1,4 @@
-<!-- status.md | version 1.3 by Albert Sheng | 2026-09-28 | D10 結案（R-EDGE-FWHM / R-NORM-COEFS z 門檻校準） -->
+<!-- status.md | version 1.4 by Albert Sheng | 2026-09-28 | GUI 加 Edge... 面板編輯 edge.* -->
 # NiXZ-121 XANES Viewer — 專案狀態
 
 最後更新：2026-09-27 18:30（UTC+8）　依據：commit `9765ac6`（2026-09-27 06:52）與工作目錄現況
@@ -16,7 +16,7 @@
 | `doc/status.md` | 1.3 |
 | `CLAUDE.md` | 1.1 |
 | `README.md` | 2.0.3 |
-| `main.py` | 1.2 |
+| `main.py` | 1.3 |
 | `pipeline.py` | 1.3 |
 | `rules.py` | 1.2.0 |
 | `examine.py` | 1.2.0 |
@@ -42,6 +42,7 @@
 | T-DRIFT、T-UPDOWN、T-OUTLIER-SCAN、T-SATURATION | 預留，未實作（需 `.bin` 逐條光譜） |
 
 - 知識庫移至 `doc/`，`CLAUDE.md` 以 `@doc/...` 自動載入。
+- v1.3 (main.py) 新增 **Edge...** 按鈕：Toplevel 面板編輯 `config.yaml` `edge.*` 全部 8 個欄位（element、edge、e0_nominal_eV、e0_alt_eV、e0_nominal_tol_eV、mono_offset_window_eV、ref_e0_search_eV、ref_e0_spread_tol_eV），可選 Save-to-config.yaml，Apply 立即重跑 Examine。Rules 面板保留獨立。
 
 ---
 
@@ -90,6 +91,7 @@
 
 | 版本 | 日期 | 內容 |
 |---|---|---|
+| 1.4 | 2026-09-28 | main.py v1.3：新增 `Edge...` 按鈕與 Toplevel 編輯器（`config.yaml edge.*` 8 個欄位；list 欄位 [a, b] 用兩個 Entry；可選 Save-to-yaml；Apply 立即重跑 Examine）。GUI smoke 測試通過（83/83） |
 | 1.3 | 2026-09-28 | D10 結案：R-EDGE-FWHM 與 R-NORM-COEFS 的 z 門檻由 110 gate-pass 分佈校準 `[3, 5] → [2.5, 4]`。分佈近乎 Gaussian，fail_z=5 於本資料永不觸發。config.yaml v1.3.0。校準後 R-EDGE-FWHM 3 WARN、R-NORM-COEFS 2 WARN；usable 保持 76/121 |
 | 1.2 | 2026-09-28 | D8 結案：GATE-EDGE `[0.10, 1.5]` 由 121 格 edge_step 分佈驗證（median=0.345, MAD·1.4826=0.167, 天然分界 0.10；110/121 pass；Gaur 標準對 mapping 過嚴）。config.yaml v1.2.1 加註出處註解 |
 | 1.1 | 2026-09-27 | CLI 端更新：D9 結案（`FNAME_RE` IGNORECASE + `validate_root` + GUI 完整性顯示 + `_select_cell_by_xz` case-insensitive）；`--batch` 重跑產出 121/121 sections, 0 errors；Examine 121 cells, 76 usable；83/83 tests；§1 版本、§3 處理結果、§4 待辦、§5 D9 狀態全部同步 |
