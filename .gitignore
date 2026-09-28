@@ -37,3 +37,7 @@ references/
 *.swo
 .DS_Store
 Thumbs.db
+
+# Word lock files and transient _new build outputs
+~$*.docx
+*_new.docx

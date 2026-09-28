@@ -8,7 +8,7 @@ Equations use OMML (Office MathML) so Word can render them natively.
 Run:
     python build_report.py
 
-version 1.2 by Albert Sheng
+version 1.3 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -895,7 +895,7 @@ def part1(doc: Document) -> None:
     add_reference(
         doc,
         '[4] T.-C. Weng, G. S. Waldo, and J. E. Penner-Hahn, "A method for '
-        'normalization of X-ray absorption spectra," '
+        'normalization of X-ray absorption spectra (MBACK)," '
         '*J. Synchrotron Rad.* **12**, 506–510 (2005). '
         'doi:10.1107/S0909049504034193.'
     )
@@ -924,7 +924,7 @@ def part1(doc: Document) -> None:
         doc,
         '[8] E. A. Stern and K. Kim, "Thickness effect on the extended-'
         'x-ray-absorption-fine-structure amplitude," '
-        '*Phys. Rev. B* **23**, 3781–3787 (1981). '
+        '*Phys. Rev. B* **23**, 3781 (1981). '
         'doi:10.1103/PhysRevB.23.3781.'
     )
     add_reference(
@@ -939,16 +939,28 @@ def part1(doc: Document) -> None:
         doc,
         "Note on source verification. References [1], [3], and [5] were "
         "consulted in full during the design of the corresponding rules "
-        "and can be cited authoritatively. References [4], [7], [8], and "
-        "[9] were confirmed from bibliographic search but not read in "
-        "full; their conclusions are cited by convention. Reference [6] "
-        "(Gaur 2026) was consulted at abstract level; the specific "
-        "recommendations we compare against in section 4.6 (edge-jump "
-        "window [0.5, 2.0], derivative-peak FWHM window [0.5, 2.0] eV) "
-        "should be verified against the full text before being adopted "
-        "in a downstream publication. Reference [2] was consulted for "
-        "the specific question of whether xraylarch's estimate_noise "
-        "applies to XANES data (it does not)."
+        "and can be cited authoritatively; reference [5] is additionally "
+        "available as a PDF in the project's references/ folder. Reference "
+        "[2] was consulted for a single specific question -- whether "
+        "xraylarch's estimate_noise applies to XANES data (it does not) -- "
+        "so only the relevant passage was read. References [4] and [9] "
+        "are cited from bibliographic metadata gathered through xraylarch's "
+        "and TXM-Wizard's own reference lists, but the original text has "
+        "not been read for this project. Reference [7] (Leys et al. 2013) "
+        "is cited from bibliographic search; the DOI and page range are "
+        "widely reported but were not verified line-by-line against the "
+        "printed article. Reference [8] (Stern and Kim 1981) is cited from "
+        "bibliographic search; the volume and starting page 3781 are "
+        "well-established but the full page range and DOI have not been "
+        "verified against the print. Reference [6] (Gaur et al. 2026) was "
+        "consulted at abstract level only; the specific numerical "
+        "recommendations we compare against in section 4.6 -- edge-jump "
+        "window [0.5, 2.0] and derivative-peak FWHM window [0.5, 2.0] eV "
+        "-- should be verified against the full text before being "
+        "propagated to a downstream publication. The DOI 10.1038/s41597-"
+        "026-07966-x follows the Scientific Data year-encoding convention "
+        "(026 = 2026) but the specific serial number component has not "
+        "been independently confirmed."
     )
 
 
