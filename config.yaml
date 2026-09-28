@@ -1,4 +1,4 @@
-# config.yaml | version 1.2.1 by Albert Sheng | GATE-EDGE 由 121 分佈驗證（D8 結案）
+# config.yaml | version 1.3.0 by Albert Sheng | R-EDGE-FWHM + R-NORM-COEFS z 門檻由分佈校準
 # NiXZ-121 examine rules & thresholds.
 # All numeric values are starting seeds, NOT literature standards.
 # Program must not hard-code thresholds elsewhere; edit this file (or use the
@@ -34,8 +34,16 @@ rules:
   R-NOISE-HF: {enabled: true,  warn_z: 3, fail_z: 5}
   R-PRE-FLAT: {enabled: true,  warn_z: 3, fail_z: 5}
   R-GLITCH:   {enabled: true,  warn_z: 3, fail_z: 5, max_count: 5}
-  R-EDGE-FWHM: {enabled: true, warn_z: 3, fail_z: 5}   # Gaur 2026 abs window 0.5-2.0 eV -> here grid-relative
-  R-NORM-COEFS: {enabled: true, warn_z: 3, fail_z: 5}  # §5.2 A Q3: pre_slope + norm_c1 + norm_c2 max-|z|
+  # R-EDGE-FWHM + R-NORM-COEFS z thresholds calibrated on 110 gate-pass cells
+  # (2026-09-28). Distributions are near-Gaussian (P50/max|z| ~ 0.67, matches
+  # N(0,1) MAD ratio 0.6745), so z ~ sigma. Old fail_z=5 was 5-sigma -> never
+  # triggered on real data. Leys 2013 suggests warn=2.5 (default), 3=very
+  # conservative; 4-sigma is the "clearly outlier" line for a near-Gaussian.
+  # On current 110-cell grid: R-EDGE-FWHM ~4 WARN 0 FAIL; R-NORM-COEFS ~3
+  # WARN 0 FAIL. Any future >=4-sigma outlier flags immediately.
+  # See doc/NiXZ-121_project.md §10 D10.
+  R-EDGE-FWHM: {enabled: true, warn_z: 2.5, fail_z: 4}   # Gaur 2026 abs window 0.5-2.0 eV -> here grid-relative
+  R-NORM-COEFS: {enabled: true, warn_z: 2.5, fail_z: 4}  # §5.2 A Q3: pre_slope + norm_c1 + norm_c2 max-|z|
   C-SHAPE:    {enabled: true,  warn_z: 3, fail_z: 5}
   C-E0-NBR:   {enabled: true,  warn_z: 3, fail_z: 5}
   C-CUMDIFF:  {enabled: false, warn_z: 3, fail_z: 5}   # Lippold 2005 crit 7 vs 8-neighbour mean; opt-in

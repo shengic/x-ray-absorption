@@ -1,4 +1,4 @@
-<!-- status.md | version 1.2 by Albert Sheng | 2026-09-28 | D8 結案（GATE-EDGE 由 121 分佈驗證） -->
+<!-- status.md | version 1.3 by Albert Sheng | 2026-09-28 | D10 結案（R-EDGE-FWHM / R-NORM-COEFS z 門檻校準） -->
 # NiXZ-121 XANES Viewer — 專案狀態
 
 最後更新：2026-09-27 18:30（UTC+8）　依據：commit `9765ac6`（2026-09-27 06:52）與工作目錄現況
@@ -11,16 +11,16 @@
 
 | 檔案 | 版本 |
 |---|---|
-| `doc/NiXZ-121_project.md` | 1.4.3 |
+| `doc/NiXZ-121_project.md` | 1.4.4 |
 | `doc/TASK_examine_rules.md` | 1.4 |
-| `doc/status.md` | 1.2 |
+| `doc/status.md` | 1.3 |
 | `CLAUDE.md` | 1.1 |
 | `README.md` | 2.0.3 |
 | `main.py` | 1.2 |
 | `pipeline.py` | 1.3 |
 | `rules.py` | 1.2.0 |
 | `examine.py` | 1.2.0 |
-| `config.yaml` | 1.2.1 |
+| `config.yaml` | 1.3.0 |
 
 測試：83/83 通過（+4：case-insensitive FNAME_RE、validate_root 完整性、regex skipped 報告、lowercase 認可）。
 
@@ -58,7 +58,8 @@
 |---|---|---|
 | ~~1~~ | ~~修正 D9（檔名大小寫），重跑 Process all + Examine，確認 121/121~~ | ~~CLI~~ **已完成 2026-09-27** |
 | ~~2~~ | ~~commit `test/` 下 3 個未提交檔~~ | ~~CLI~~ **已完成 2026-09-27** |
-| 1 | 以 121 格實際分佈校準 R-EDGE-FWHM、R-NORM-COEFS 及 z 門檻（**GATE-EDGE D8 2026-09-28 結案，保留 [0.10, 1.5]**） | 使用者＋規劃端 |
+| ~~1~~ | ~~以 121 格實際分佈校準 R-EDGE-FWHM、R-NORM-COEFS 及 z 門檻~~ | ~~使用者＋規劃端~~ **已完成 2026-09-28**（D8 保留 [0.10, 1.5]；D10 兩規則 z 改為 [2.5, 4]） |
+| 1 | 其餘 smooth／consistent 規則的 z 門檻（R-SNR、R-NOISE-HF、R-PRE-FLAT、R-GLITCH、C-SHAPE、C-E0-NBR）是否也要由 121 分佈校準 | 使用者決定 |
 | 2 | 確認 `.bin` 格式後實作 T-* 規則 | 待資料（project.md §8 #2） |
 | 3 | MySQL 接線（`db.enabled: false`） | 待 schema 定稿 |
 | 4 | `combine_mode: weighted`（目前拋 NotImplementedError） | 未排程 |
@@ -72,6 +73,7 @@
 | D9 | `image_AI_Ni/Z6_1/x5_0_666_786_XANES.txt` 開頭為小寫 `x`；`pipeline.FNAME_RE` 為 `^X...`（大小寫敏感），Windows 上 `glob("X*")` 不分大小寫會列出、再被 regex 濾掉 → 該格**無警告地略過** | **結案（2026-09-27）**：`FNAME_RE` 加 `re.IGNORECASE`；新增 `validate_root()` 完整性檢查；121/121 已重跑 |
 | D2 | 各 Z 資料夾的區段編號不同（例：Z6_1 為 1_120、134_254、268_388…；Z5_0 為 1_120、136_256、272_392…），`X0_5_1_120` 同名屬巧合 | 已釐清，見 §10 |
 | D8 | GATE-EDGE 門檻 [0.1, 1.5] vs Gaur 2026 [0.5, 2.0] | **結案（2026-09-28）**：121 格分佈驗證，[0.10, 1.5] pass 110/121 (90.9%)；11 FAIL 全於幾何邊緣；Gaur 標準對 mapping 過嚴 |
+| D10 | R-EDGE-FWHM / R-NORM-COEFS 預設 z 門檻 `[3, 5]` 對近 Gaussian 分佈過保守（fail_z=5 永不觸發） | **結案（2026-09-28）**：兩規則改為 `[warn=2.5, fail=4]`（Leys 2013 預設；4σ 明確離群）；R-EDGE-FWHM 3 WARN 0 FAIL，R-NORM-COEFS 2 WARN 0 FAIL |
 
 ---
 
@@ -88,6 +90,7 @@
 
 | 版本 | 日期 | 內容 |
 |---|---|---|
+| 1.3 | 2026-09-28 | D10 結案：R-EDGE-FWHM 與 R-NORM-COEFS 的 z 門檻由 110 gate-pass 分佈校準 `[3, 5] → [2.5, 4]`。分佈近乎 Gaussian，fail_z=5 於本資料永不觸發。config.yaml v1.3.0。校準後 R-EDGE-FWHM 3 WARN、R-NORM-COEFS 2 WARN；usable 保持 76/121 |
 | 1.2 | 2026-09-28 | D8 結案：GATE-EDGE `[0.10, 1.5]` 由 121 格 edge_step 分佈驗證（median=0.345, MAD·1.4826=0.167, 天然分界 0.10；110/121 pass；Gaur 標準對 mapping 過嚴）。config.yaml v1.2.1 加註出處註解 |
 | 1.1 | 2026-09-27 | CLI 端更新：D9 結案（`FNAME_RE` IGNORECASE + `validate_root` + GUI 完整性顯示 + `_select_cell_by_xz` case-insensitive）；`--batch` 重跑產出 121/121 sections, 0 errors；Examine 121 cells, 76 usable；83/83 tests；§1 版本、§3 處理結果、§4 待辦、§5 D9 狀態全部同步 |
 | 1.0 | 2026-09-27 | by Albert Sheng。初版：依 commit 9765ac6 與工作目錄現況建立；記錄 120/121 處理結果與 D9 |
