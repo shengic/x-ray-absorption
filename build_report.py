@@ -8,7 +8,7 @@ Equations use OMML (Office MathML) so Word can render them natively.
 Run:
     python build_report.py
 
-version 1.0 by Albert Sheng
+version 1.1 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -190,18 +190,19 @@ def part1(doc: Document) -> None:
         "dataset acquired at the NSRRC TPS 44A quick-EXAFS (QEXAFS) beamline "
         "on a Ni sample scanned over an 11 x 11 spatial grid (121 sections "
         "total). Stage one applies the standard xraylarch pre_edge routine "
-        "to obtain edge energy E0, edge step Delta mu 0, and normalized "
+        "[1] to obtain edge energy E0, edge step Delta mu 0, and normalized "
         "absorption per cell. Stage two evaluates eleven configurable rules "
         "producing two orthogonal per-cell flags -- smooth (measurement "
         "quality) and consistent (grid-wide chemistry agreement) -- via "
-        "robust median-absolute-deviation z-scores computed against only "
-        "cells that pass a hard edge_step gate. Thresholds are data-driven, "
-        "calibrated from the observed 121-cell distributions. A dedicated "
-        "rule (C-CUMDIFF) implements Lippold et al.'s criterion 7 adapted "
-        "to spatial mapping: the reference is the 8-neighbour mean rather "
-        "than a scan leave-one-out average. The full workflow is exposed "
-        "through a Tk GUI and a headless CLI, with all thresholds and edge "
-        "parameters editable from a single tabbed configuration panel."
+        "robust median-absolute-deviation z-scores [7] computed against "
+        "only cells that pass a hard edge_step gate [3, 8]. Thresholds are "
+        "data-driven, calibrated from the observed 121-cell distributions. "
+        "A dedicated rule (C-CUMDIFF) implements Lippold et al.'s criterion "
+        "7 [5] adapted to spatial mapping: the reference is the 8-neighbour "
+        "mean rather than a scan leave-one-out average. The full workflow "
+        "is exposed through a Tk GUI and a headless CLI, with all "
+        "thresholds and edge parameters editable from a single tabbed "
+        "configuration panel."
     )
 
     # ----------------------------------------------------------------------
@@ -224,14 +225,18 @@ def part1(doc: Document) -> None:
     para(
         doc,
         "Existing XAS quality-control literature focuses either on single "
-        "bulk-transmission spectra (Gaur et al. 2026) or on repeated scans "
-        "of the same sample (Lippold et al. 2005). Neither directly "
+        "bulk-transmission spectra (Gaur et al. [6]) or on repeated scans "
+        "of the same sample (Lippold et al. [5]). Neither directly "
         "addresses the spatial-mapping case, where genuine chemical "
         "differences between neighbouring cells must be preserved rather "
         "than flagged as artefacts. Our two-flag design (smooth vs "
         "consistent) preserves this distinction: a cell whose consistent "
         "flag fires but whose smooth flag is clean represents a candidate "
-        "for further chemical analysis, not a candidate for exclusion."
+        "for further chemical analysis, not a candidate for exclusion. "
+        "A closely related decision framework for full-field transmission "
+        "X-ray microscopy is the TXM-Wizard by Liu et al. [3], from which "
+        "we borrow the edge-jump filter and normalization-slope filter "
+        "concepts."
     )
 
     # ----------------------------------------------------------------------
@@ -268,7 +273,15 @@ def part1(doc: Document) -> None:
     para(
         doc,
         "Stage one closely follows the xraylarch documentation (Newville, "
-        "xraylarch 2026.3.1, section 14.2). For each cell we:"
+        "xraylarch 2026.3.1, section 14.2 [1]). The isolate-edge-then-"
+        "normalize convention -- linear pre-edge subtraction, polynomial "
+        "post-edge fit, division by edge step -- is standard across all "
+        "modern XAS analysis packages including ATHENA / ARTEMIS [9] and "
+        "the earlier IFEFFIT toolkit. An alternative background-removal "
+        "method (MBACK [4]) uses tabulated absorption cross-sections to "
+        "anchor the post-edge asymptote and can be preferable for fluor"
+        "escence data, but transmission-mode QEXAFS data such as ours is "
+        "well served by the polynomial approach. For each cell we:"
     )
     numbered(doc, "Read energy, mu, mu_ref via numpy.loadtxt with comments='#'.")
     numbered(
@@ -381,7 +394,7 @@ def part1(doc: Document) -> None:
     para(
         doc,
         "All grid-scoped rules use a robust z-score based on median and "
-        "median-absolute deviation (MAD), following Leys et al. 2013:"
+        "median-absolute deviation (MAD), following Leys et al. [7]:"
     )
     z_eq = (
         _sub(_r("z", italic=True), _r("k")) + _r(" = ")
@@ -394,12 +407,19 @@ def part1(doc: Document) -> None:
     add_display_math(doc, z_eq)
     para(
         doc,
-        "The scale factor 1.4826 ensures that the resulting z is unit-"
-        "normal-distributed for large samples drawn from N(0, sigma^2). "
-        "Median and MAD are computed only over cells passing GATE-EDGE, so "
-        "off-sample pixels do not skew the baseline. When MAD evaluates to "
-        "zero (unrealistically uniform grid), the rule returns N/A rather "
-        "than falsely PASSing."
+        "The scale factor 1.4826 = 1 / Phi^{-1}(0.75) ensures that the "
+        "resulting z is unit-normal-distributed for large samples drawn "
+        "from N(0, sigma^2). Median and MAD are computed only over cells "
+        "passing GATE-EDGE, so off-sample pixels do not skew the baseline. "
+        "When MAD evaluates to zero (unrealistically uniform grid), the "
+        "rule returns N/A rather than falsely PASSing. Leys et al. [7] "
+        "recommend warn_z = 2.5 as a sensible default for real experimental "
+        "distributions and warn_z = 3 as very conservative; classical "
+        "standard-deviation-based outlier detection has a breakdown point "
+        "of 0% (a single arbitrary outlier can move the mean and inflate "
+        "the standard deviation without bound), whereas MAD has a breakdown "
+        "point of 50%, making it robust to the very artefacts we are "
+        "trying to detect."
     )
 
     h3(doc, "4.3 Energy calibration")
@@ -429,12 +449,15 @@ def part1(doc: Document) -> None:
         "monitored separately by the CAL-EREF L1 check."
     )
 
-    h3(doc, "4.4 Rule catalogue")
+    h3(doc, "4.4 Rule catalogue and physical basis")
     para(
         doc,
         "The current implementation registers the following eleven rules. "
         "Each row lists the rule ID, flag, scope, prerequisite rules, and "
-        "the underlying observable."
+        "the underlying observable. The narrative below the table maps "
+        "each rule (or rule cluster) to the physical or statistical result "
+        "it operationalises, and to the source in which that result was "
+        "first described."
     )
     make_table(
         doc,
@@ -465,15 +488,123 @@ def part1(doc: Document) -> None:
         ]
     )
 
+    para(
+        doc,
+        "GATE-EDGE bounds. The lower bound implements a version of the "
+        "TXM-Wizard edge-jump filter [3], which rejects pixels whose edge "
+        "step falls below a user-set multiple of the local pre-edge noise. "
+        "For a transmission-mode measurement at a photon energy above the "
+        "absorption edge, the sample's absorptance follows the Beer-Lambert "
+        "law A = 1 - exp(-mu * t * rho), so the observable edge step is "
+        "monotonically increasing in the product of areal absorber density "
+        "and thickness. Cells whose edge step falls below 0.10 correspond "
+        "to a Ni areal loading indistinguishable from zero for our beam "
+        "profile, i.e. off-sample or void pixels. The upper bound protects "
+        "against the thickness effect described by Stern and Kim [8]: at "
+        "total absorption products above roughly mu * t ~ 2.5, the "
+        "measured pre-edge to post-edge jump saturates, distorting the "
+        "white-line amplitude and the EXAFS oscillations. Gaur et al. [6] "
+        "adopt the wider range [0.5, 2.0] for bulk-transmission single-"
+        "spectrum acquisition; we use [0.10, 1.5] to preserve the physical "
+        "meaning of the lower bound for our mapping case, in which off-"
+        "sample pixels are expected."
+    )
+    para(
+        doc,
+        "CAL-EREF. Absolute energy calibration against a foil placed "
+        "downstream of the sample is standard beamline practice [6]. Our "
+        "L1 check confirms the reference channel's E0 lands close enough "
+        "to the tabulated Ni K edge value that the identification is "
+        "unambiguous; the wide default window [-5, 25] eV accommodates "
+        "the current beamline's systematic monochromator scaling offset "
+        "of approximately +13 eV. L3 checks internal consistency: because "
+        "the same reference foil is measured simultaneously with every "
+        "cell, its E0 should be spatially constant across the grid. Any "
+        "significant scatter indicates a scan-time drift in the "
+        "monochromator or in the pixel-time energy reconstruction. The "
+        "current 121-cell run has 77 L3 WARN cells, motivating either an "
+        "increase in ref_e0_spread_tol_eV or a look at row-time correlation."
+    )
+    para(
+        doc,
+        "R-SNR and R-PRE-FLAT. The classical TXM-Wizard normalization "
+        "filter [3] flags pixels whose fitted pre-edge slope is anomalously "
+        "large; we split the underlying concern into two rules with "
+        "different observables. R-PRE-FLAT looks at the residual of the "
+        "linear pre-edge fit, which grows when the pre-edge region is "
+        "contaminated by scattering, harmonic content, or amplifier "
+        "nonlinearity. R-SNR uses the dimensionless ratio edge_step / "
+        "q3_pre_flatness (both measured in raw mu units so their ratio is "
+        "unitless) as an edge-to-baseline-noise figure of merit, directly "
+        "analogous to the edge-jump filter threshold EJFT used in TXM-"
+        "Wizard's manual (EJFT = 8 in worked examples)."
+    )
+    para(
+        doc,
+        "R-NOISE-HF. Random shot noise in a transmission measurement "
+        "produces high-frequency, uncorrelated fluctuations superimposed "
+        "on the smoothly varying atomic and structural absorption. We "
+        "isolate that noise by taking the second finite difference of the "
+        "flattened spectrum in the EXAFS region (E >= E0 + 150 eV), which "
+        "suppresses linear and quadratic drift and passes noise. The RMS "
+        "of the resulting series is used as a per-cell noise proxy. "
+        "Xraylarch's estimate_noise routine [2] performs an analogous "
+        "computation designed for chi(R) analysis but is not directly "
+        "applicable to our raw normalized data."
+    )
+    para(
+        doc,
+        "R-GLITCH. Bragg glitches from the monochromator's Si(111) "
+        "crystal, top-up injection transients on the storage ring, and "
+        "individual bad pixels all manifest as isolated points that "
+        "deviate strongly from their neighbours in the derivative. We use "
+        "the same first-difference stream underlying R-NOISE-HF but count "
+        "the number of points exceeding 5 x MAD, rather than summing their "
+        "energy. An absolute threshold max_count = 5 ensures that a cell "
+        "with even a few genuine glitches fails regardless of the grid-"
+        "wide statistics, since a single misplaced point in the near-edge "
+        "region can invalidate white-line amplitude estimates."
+    )
+    para(
+        doc,
+        "R-EDGE-FWHM. The full-width at half-maximum of the first "
+        "derivative dmu/dE at the absorption edge is a convolution of the "
+        "Ni 1s core-hole lifetime broadening (approximately 1.4 eV FWHM), "
+        "the monochromator's energy resolution (~1 eV FWHM at 8 keV for "
+        "Si(111)), and any additional broadening from unresolved chemical-"
+        "state distributions or sample inhomogeneity within the beam "
+        "footprint. Gaur et al. [6] use an absolute FWHM window of "
+        "[0.5, 2.0] eV as a resolution acceptance criterion for XAS "
+        "database inclusion. For a spatial map at a single beamline, the "
+        "resolution component is constant across cells, so we use a grid-"
+        "relative two-sided MAD z-score instead: broadening flags real "
+        "inhomogeneity, narrowing flags white-line loss or E0 mis-"
+        "identification."
+    )
+    para(
+        doc,
+        "R-NORM-COEFS. The larch pre_edge routine returns three "
+        "coefficients describing the post-edge polynomial fit -- the "
+        "constant norm_c0 (which sets the normalization scale), the "
+        "linear norm_c1, and the quadratic norm_c2 -- together with the "
+        "pre-edge line slope pre_slope. For a spatially uniform beam and "
+        "detector, these should form a tight distribution across the 121 "
+        "cells. Anomalies in any of the three signal scattering, harmonic "
+        "contamination, saturation, or a misplaced pre/post-edge window. "
+        "We take the single worst |z| among the three as the rule's value, "
+        "with the reason string identifying which coefficient triggered."
+    )
+
     h3(doc, "4.5 Consistency rules")
     para(
         doc,
         "C-SHAPE quantifies overall spectral shape agreement using the "
-        "Ravel and Newville R-factor. Cells passing GATE-EDGE and CAL-EREF "
-        "have their corrected norm interpolated onto the common grid "
-        "[E0_med - 30, E0_med + 150] eV at 0.30 eV step. The pointwise "
-        "median across all interpolated cells forms the reference n_med, "
-        "and each cell's residual is:"
+        "R-factor of Ravel and Newville [9] as originally defined for "
+        "ATHENA / ARTEMIS quantitative fit quality assessment. Cells "
+        "passing GATE-EDGE and CAL-EREF have their corrected norm "
+        "interpolated onto the common grid [E0_med - 30, E0_med + 150] eV "
+        "at 0.30 eV step. The pointwise median across all interpolated "
+        "cells forms the reference n_med, and each cell's residual is:"
     )
     r_eq = (
         _sub(_r("R", italic=True), _r("k")) + _r(" = ")
@@ -500,10 +631,15 @@ def part1(doc: Document) -> None:
     )
     para(
         doc,
-        "C-CUMDIFF implements Lippold et al.'s criterion 7 with the "
+        "C-CUMDIFF implements Lippold et al.'s [5] criterion 7 with the "
         "reference redefined as the mean of the eight spatial neighbours "
-        "rather than a scan-wise leave-one-out average. Given corrected "
-        "spectra spec and reference ref on the same grid:"
+        "rather than a scan-wise leave-one-out average. Lippold et al. "
+        "compared eight statistical criteria for detecting systematic "
+        "deviations in repeated BioXAS scans and found that the standard "
+        "deviation of the residual of the cumulative-difference spectrum "
+        "after a linear-regression detrend was the most reliable single "
+        "figure of merit. Given corrected spectra spec and reference ref "
+        "on the same grid:"
     )
     D_eq = (
         _r("D(") + _r("i") + _r(") = ")
@@ -524,18 +660,28 @@ def part1(doc: Document) -> None:
         "Criterion 7 is the standard deviation of A(j) after a linear-"
         "regression detrend. Cumulative summation amplifies four archetypal "
         "systematic deviations (group offsets, jump discontinuities, slope "
-        "changes, periodic bending) while attenuating random noise. Cells "
-        "with fewer than two valid spatial neighbours on the common grid "
-        "return N/A. The Lippold paper's absolute stopping threshold (0.1) "
-        "is system-specific and is not applied here; a grid-relative MAD z-"
-        "score is used instead."
+        "changes, periodic bending) while attenuating random noise; this "
+        "amplification factor is empirically two to three orders of "
+        "magnitude for the artefacts illustrated in Lippold et al. [5], "
+        "Table 1. Cells with fewer than two valid spatial neighbours on "
+        "the common grid return N/A. The Lippold paper's absolute stopping "
+        "threshold (0.1) is system-specific and is not applied here; a "
+        "grid-relative MAD z-score is used instead."
     )
     para(
         doc,
         "C-E0-NBR compares each cell's corrected E0 against the median of "
         "its up to eight spatial neighbours' corrected E0s, applying a two-"
-        "sided robust z-score. Because a hit here can indicate genuine "
-        "chemistry, only the consistent flag is affected."
+        "sided robust z-score. This is spatially local rather than grid-"
+        "global because gradual electrochemical gradients across the "
+        "sample are expected and should not produce failures; only cells "
+        "that step out from their immediate spatial context are flagged. "
+        "The concept is closest to the edge-energy grouping proposed by "
+        "Liu et al. [3] in the TXM-Wizard context, though we use a "
+        "neighbour-median comparison rather than a global cluster label. "
+        "Because a hit here can indicate genuine chemistry (different "
+        "oxidation state at that spot), only the consistent flag is "
+        "affected -- usability is preserved."
     )
 
     h3(doc, "4.6 Threshold calibration")
@@ -553,9 +699,12 @@ def part1(doc: Document) -> None:
         "cells populate [0.13, 0.93]. The chosen lower bound 0.10 sits in "
         "the gap; 90.9% of cells pass. All 11 failures lie on the sample's "
         "geometric left edge (X10_-5 column) or corners, consistent with "
-        "the intended semantics of GATE-EDGE. The Gaur 2026 recommendation "
-        "of [0.5, 2.0] would reject 102 of 121 cells and is therefore "
-        "inappropriate for spatial mapping."
+        "the intended semantics of GATE-EDGE. The Gaur et al. [6] "
+        "recommendation of [0.5, 2.0] would reject 102 of 121 cells and "
+        "is therefore inappropriate for spatial mapping in which off-"
+        "sample pixels are structurally present. The upper bound 1.5 sits "
+        "well above the observed maximum of 0.93 but leaves headroom for "
+        "thicker future samples before the thickness-effect regime [8]."
     )
     para(
         doc,
@@ -564,11 +713,14 @@ def part1(doc: Document) -> None:
         "the theoretical N(0,1) MAD/max ratio 0.6745). The old defaults "
         "warn_z = 3, fail_z = 5 correspond to 3-sigma and 5-sigma "
         "respectively; on n = 110 the 5-sigma level triggers essentially "
-        "never (theoretical rate 6e-7). We therefore adopted warn_z = 2.5 "
-        "(Leys 2013 default) and fail_z = 4 (clear outlier line for a "
-        "near-Gaussian). Under the new thresholds R-EDGE-FWHM flags 3 "
-        "WARN 0 FAIL and R-NORM-COEFS flags 2 WARN 0 FAIL, while any "
-        "future outlier at |z| >= 4 is caught immediately."
+        "never (theoretical rate 6e-7 per cell, i.e. one occurrence per "
+        "~1.7 million cells for a purely Gaussian distribution). We "
+        "therefore adopted warn_z = 2.5 (Leys et al. [7] default) and "
+        "fail_z = 4 (clear outlier line for a near-Gaussian, corresponding "
+        "to a Gaussian tail probability of ~6e-5). Under the new "
+        "thresholds R-EDGE-FWHM flags 3 WARN 0 FAIL and R-NORM-COEFS flags "
+        "2 WARN 0 FAIL on the current data, while any future outlier at "
+        "|z| >= 4 will be caught immediately."
     )
 
     # ----------------------------------------------------------------------
