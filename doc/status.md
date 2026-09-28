@@ -1,4 +1,4 @@
-<!-- status.md | version 1.5 by Albert Sheng | 2026-09-28 | Rules + Edge 合併為 Config... 分頁面板 -->
+<!-- status.md | version 1.6 by Albert Sheng | 2026-09-28 | Config 面板加 clickable help links -->
 # NiXZ-121 XANES Viewer — 專案狀態
 
 最後更新：2026-09-27 18:30（UTC+8）　依據：commit `9765ac6`（2026-09-27 06:52）與工作目錄現況
@@ -16,9 +16,9 @@
 | `doc/status.md` | 1.3 |
 | `CLAUDE.md` | 1.1 |
 | `README.md` | 2.0.3 |
-| `main.py` | 1.4 |
+| `main.py` | 1.5 |
 | `pipeline.py` | 1.3 |
-| `rules.py` | 1.2.0 |
+| `rules.py` | 1.3.0 |
 | `examine.py` | 1.2.0 |
 | `config.yaml` | 1.3.0 |
 
@@ -43,6 +43,7 @@
 
 - 知識庫移至 `doc/`，`CLAUDE.md` 以 `@doc/...` 自動載入。
 - v1.4 (main.py) 將 `Rules...` 與 `Edge...` 合併為單一 **`Config...`** 按鈕；Toplevel 內含 `ttk.Notebook` 兩分頁（Rules / Edge），共用 Save-to-yaml checkbox + Apply & Examine + Close。刪除 `show_rules_panel`、`show_edge_panel`、兩份 `_apply_*` 與 `rules_window`、`edge_window` 等狀態欄位（-30 行）。校準時可一次動兩區、跑一次 Examine。
+- v1.5 (main.py) Config 面板：每條規則名稱與每個 edge 欄位名稱都是**可點擊的說明連結**（藍色底線、hand2 游標）。點擊 → messagebox 顯示：rule 端 flag/scope/requires + docstring；edge 端 curated 說明字典。rules.py v1.3.0 補齊 7 條規則的 docstring（GATE-EDGE、CAL-EREF、R-NOISE-HF、R-PRE-FLAT、R-GLITCH、R-SNR、C-SHAPE、C-E0-NBR），R-EDGE-FWHM/R-NORM-COEFS/C-CUMDIFF 原本就有。
 
 ---
 
@@ -91,6 +92,7 @@
 
 | 版本 | 日期 | 內容 |
 |---|---|---|
+| 1.6 | 2026-09-28 | main.py v1.5 / rules.py v1.3.0：Config 面板加 clickable help links。規則名稱點擊 → flag/scope/requires + rule fn docstring；edge 欄位名稱點擊 → curated EDGE_HELP 字典說明。補齊 7 條缺 docstring 的規則（GATE-EDGE、CAL-EREF、R-NOISE-HF、R-PRE-FLAT、R-GLITCH、R-SNR、C-SHAPE、C-E0-NBR）。83/83 tests |
 | 1.5 | 2026-09-28 | main.py v1.4：`Rules...` + `Edge...` 合併為 `Config...` 分頁面板（ttk.Notebook）。共用 footer（Save + Apply + Close），一次 Apply 同步兩區並只跑一次 Examine。刪除 4 個舊方法與 2 個狀態欄位，程式淨減 ~30 行。83/83 tests |
 | 1.4 | 2026-09-28 | main.py v1.3：新增 `Edge...` 按鈕與 Toplevel 編輯器（`config.yaml edge.*` 8 個欄位；list 欄位 [a, b] 用兩個 Entry；可選 Save-to-yaml；Apply 立即重跑 Examine）。GUI smoke 測試通過（83/83） |
 | 1.3 | 2026-09-28 | D10 結案：R-EDGE-FWHM 與 R-NORM-COEFS 的 z 門檻由 110 gate-pass 分佈校準 `[3, 5] → [2.5, 4]`。分佈近乎 Gaussian，fail_z=5 於本資料永不觸發。config.yaml v1.3.0。校準後 R-EDGE-FWHM 3 WARN、R-NORM-COEFS 2 WARN；usable 保持 76/121 |

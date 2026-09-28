@@ -6,7 +6,7 @@ and returns RuleResult(level, value, reason).
 
 Levels: PASS(0), WARN(1), FAIL(2), None = N/A.
 
-version 1.2.0 by Albert Sheng
+version 1.3.0 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -119,6 +119,10 @@ def _two_sided_z(v: float | None, stats: dict, params: dict,
 
 @rule("GATE-EDGE", flag="gate", scope="cell")
 def _gate_edge(ctx, cell, params) -> RuleResult:
+    """Hard bound on the edge_step (Δμ₀). Cells outside [min, max] FAIL and
+    are excluded from the baseline stats used by every downstream rule.
+    Params: min (lower bound, default 0.10 - excludes off-sample pixels),
+    max (upper bound, default 1.5 - guards against thickness effect)."""
     v = cell.meta.get("edge_step")
     if v is None:
         return RuleResult(FAIL, None, "edge_step missing")
@@ -130,6 +134,13 @@ def _gate_edge(ctx, cell, params) -> RuleResult:
 
 @rule("CAL-EREF", flag="gate", scope="grid")
 def _cal_eref(ctx, cell, params) -> RuleResult:
+    """Reference-channel energy-calibration gate. Two-stage check:
+    L1 -- mu_ref_e0 - e0_nominal_eV must fall inside mono_offset_window_eV
+         (catches mu_ref that picked a glitch instead of the true edge);
+    L3 -- |mu_ref_e0 - median(mu_ref_e0)| across the grid must be within
+         ref_e0_spread_tol_eV (Ni foil E0 should be constant grid-wide;
+         exceeding it means row-to-row drift).
+    L1 fail -> FAIL. L3 fail -> WARN. All thresholds come from config.edge.*."""
     ref = cell.meta.get("mu_ref_e0")
     if ref is None:
         return RuleResult(None, None, "mu_ref_e0 missing")
@@ -152,12 +163,20 @@ def _cal_eref(ctx, cell, params) -> RuleResult:
 
 @rule("R-NOISE-HF", flag="smooth", scope="grid", requires=("GATE-EDGE",))
 def _r_noise_hf(ctx, cell, params) -> RuleResult:
+    """Post-edge high-frequency noise. RMS of the 2nd difference of `flat`
+    for E >= E0 + 150 eV (EXAFS region). One-sided upper MAD z-score --
+    values much larger than the grid median indicate a noisy cell.
+    Params: warn_z (default 3), fail_z (default 5)."""
     v = cell.meta.get("q2_hf_noise")
     return _upper_z(v, ctx.stats.get("q2_hf_noise"), params, "q2_hf_noise missing")
 
 
 @rule("R-PRE-FLAT", flag="smooth", scope="grid", requires=("GATE-EDGE",))
 def _r_pre_flat(ctx, cell, params) -> RuleResult:
+    """Pre-edge fit residual RMS on the raw μ (in [E0+pre1, E0+pre2]).
+    Grows when the pre-edge region isn't well described by a straight
+    line -- scattering, harmonic contamination, or leaks. One-sided
+    upper MAD z-score. Params: warn_z (default 3), fail_z (default 5)."""
     v = cell.meta.get("q3_pre_flatness")
     return _upper_z(v, ctx.stats.get("q3_pre_flatness"), params,
                     "q3_pre_flatness missing")
@@ -217,6 +236,12 @@ def _r_norm_coefs(ctx, cell, params) -> RuleResult:
 
 @rule("R-GLITCH", flag="smooth", scope="grid", requires=("GATE-EDGE",))
 def _r_glitch(ctx, cell, params) -> RuleResult:
+    """Count of MAD-outlier points in `flat` for E >= E0 + 150 eV --
+    detects monochromator glitches, Bragg peaks, or top-up transients.
+    Two-tier decision:
+      1. absolute count > max_count -> FAIL immediately;
+      2. otherwise, one-sided upper MAD z-score against the grid.
+    Params: max_count (default 5), warn_z (3), fail_z (5)."""
     v = cell.meta.get("q5_glitches")
     if v is None:
         return RuleResult(None, None, "q5_glitches missing")
@@ -231,6 +256,11 @@ def _r_glitch(ctx, cell, params) -> RuleResult:
 
 @rule("R-SNR", flag="smooth", scope="grid", requires=("GATE-EDGE",))
 def _r_snr(ctx, cell, params) -> RuleResult:
+    """Edge-to-noise ratio: edge_step / q3_pre_flatness (both in raw μ ->
+    dimensionless). Lower SNR is bad, so this is a one-sided *lower*
+    MAD z-score -- z <= -warn_z -> WARN, z <= -fail_z -> FAIL.
+    Related to R-PRE-FLAT (shares q3); weight if using combine_mode=weighted.
+    Params: warn_z (default 3), fail_z (default 5)."""
     step = cell.meta.get("edge_step")
     q3 = cell.meta.get("q3_pre_flatness")
     if step is None or q3 is None or q3 <= 0:
@@ -255,6 +285,12 @@ def _r_snr(ctx, cell, params) -> RuleResult:
 @rule("C-SHAPE", flag="consistent", scope="grid",
       requires=("GATE-EDGE", "CAL-EREF"))
 def _c_shape(ctx, cell, params) -> RuleResult:
+    """R-factor of this cell's corrected `norm` versus the pointwise median
+    of all gate+cal-passing cells, both interpolated onto a common energy
+    grid ([E0_med + shape_grid_eV[0], E0_med + shape_grid_eV[1]] at
+    shape_grid_eV[2] step, from config.examine). One-sided upper MAD
+    z-score. Cells whose energy range doesn't cover the common grid
+    return N/A. Params: warn_z (default 3), fail_z (default 5)."""
     r = ctx.shape_r.get(cell.key)
     if r is None:
         return RuleResult(None, None, "no shape residual (excluded from median)")
@@ -264,6 +300,12 @@ def _c_shape(ctx, cell, params) -> RuleResult:
 @rule("C-E0-NBR", flag="consistent", scope="grid",
       requires=("GATE-EDGE", "CAL-EREF"))
 def _c_e0_nbr(ctx, cell, params) -> RuleResult:
+    """Corrected E0 versus the median of the 8-neighbour corrected E0s.
+    Two-sided MAD z-score (both too-high and too-low are anomalies).
+    Cells with fewer than 2 valid neighbours return N/A. Because a hit
+    here can be real chemistry (different oxidation state at that spot),
+    it flags `consistent` -- doesn't kill `usable`. Params: warn_z (3),
+    fail_z (5)."""
     d = ctx.e0_nbr_diff.get(cell.key)
     if d is None:
         return RuleResult(None, None, "<2 valid neighbors")

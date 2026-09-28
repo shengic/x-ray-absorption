@@ -15,7 +15,7 @@ Cache:
 Batch mode (no GUI):
     python main.py --batch image_AI_Ni
 
-version 1.4 by Albert Sheng
+version 1.5 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -628,6 +628,50 @@ class XANESViewer:
         ttk.Button(footer, text="Apply & Examine",
                    command=self._apply_config_and_examine).pack(side=tk.RIGHT, padx=4)
 
+    def _link_label(self, parent, text, on_click):
+        """A blue underlined label that runs `on_click()` when clicked.
+        Cursor changes to 'hand2' on hover -- looks like a hyperlink."""
+        from tkinter import font as tkfont
+        lbl = ttk.Label(parent, text=text,
+                        foreground="#0645ad", cursor="hand2")
+        base = tkfont.nametofont("TkDefaultFont")
+        linkfont = tkfont.Font(
+            family=base.actual("family"),
+            size=base.actual("size"),
+            weight=base.actual("weight"),
+            slant=base.actual("slant"),
+            underline=True,
+        )
+        lbl.configure(font=linkfont)
+        lbl.bind("<Button-1>", lambda _e: on_click())
+        return lbl
+
+    def _show_rule_help(self, rid: str):
+        import inspect
+        try:
+            import rules as rl
+        except Exception as e:
+            messagebox.showerror("rules import error", str(e))
+            return
+        r = rl.REGISTRY.get(rid)
+        if r is None:
+            messagebox.showinfo(f"Help — {rid}", "(rule not registered)")
+            return
+        doc = inspect.getdoc(r.fn) or "(no description available)"
+        req = ", ".join(r.requires) if r.requires else "(none)"
+        messagebox.showinfo(
+            f"Help — {rid}",
+            f"Rule:     {rid}\n"
+            f"Flag:     {r.flag}\n"
+            f"Scope:    {r.scope}\n"
+            f"Requires: {req}\n\n"
+            f"{doc}"
+        )
+
+    def _show_edge_help(self, key: str):
+        msg = self.EDGE_HELP.get(key, "(no description available)")
+        messagebox.showinfo(f"Help — {key}", msg)
+
     def _build_rules_tab(self, parent, cfg, rl):
         header = ttk.Frame(parent, padding=6)
         header.pack(fill=tk.X, side=tk.TOP)
@@ -638,8 +682,9 @@ class XANESViewer:
         ).pack(anchor=tk.W)
         body = ttk.Frame(parent, padding=6)
         body.pack(fill=tk.BOTH, expand=True)
-        ttk.Label(body, text="Rule", font=("TkDefaultFont", 9, "bold"),
-                  width=14).grid(row=0, column=0, sticky=tk.W)
+        ttk.Label(body, text="Rule (click for help)",
+                  font=("TkDefaultFont", 9, "bold"),
+                  width=22).grid(row=0, column=0, sticky=tk.W)
         ttk.Label(body, text="On", font=("TkDefaultFont", 9, "bold")
                   ).grid(row=0, column=1)
         ttk.Label(body, text="Flag", font=("TkDefaultFont", 9, "bold")
@@ -656,7 +701,9 @@ class XANESViewer:
             enabled = bool(rc.get("enabled", False))
             var_en = tk.BooleanVar(value=enabled)
             self.rule_enabled_vars[rid] = var_en
-            ttk.Label(body, text=rid).grid(row=r_i, column=0, sticky=tk.W)
+            self._link_label(
+                body, rid, lambda r=rid: self._show_rule_help(r)
+            ).grid(row=r_i, column=0, sticky=tk.W)
             ttk.Checkbutton(body, variable=var_en).grid(row=r_i, column=1)
             ttk.Label(body, text=rl.REGISTRY[rid].flag,
                       foreground="#555").grid(row=r_i, column=2, padx=4)
@@ -691,8 +738,9 @@ class XANESViewer:
         self.edge_vars = {}
         for r, key in enumerate(self.EDGE_KEYS):
             val = edge_cfg.get(key)
-            ttk.Label(body, text=key, anchor=tk.W, width=24).grid(
-                row=r, column=0, sticky=tk.W, pady=2)
+            self._link_label(
+                body, key, lambda k=key: self._show_edge_help(k)
+            ).grid(row=r, column=0, sticky=tk.W, pady=2)
             if isinstance(val, list) and len(val) == 2:
                 v1 = tk.StringVar(value=str(val[0]))
                 v2 = tk.StringVar(value=str(val[1]))
@@ -854,6 +902,38 @@ class XANESViewer:
         "e0_nominal_eV", "e0_alt_eV", "e0_nominal_tol_eV",
         "mono_offset_window_eV", "ref_e0_search_eV", "ref_e0_spread_tol_eV",
     )
+
+    EDGE_HELP = {
+        "element": "Chemical symbol of the absorber (e.g. 'Ni'). Used for "
+                   "reference lookups; not currently consumed by any rule.",
+        "edge":    "Absorption edge letter (K, L1, L2, L3). Ni K nominal "
+                   "= 8333 eV. Documented for traceability.",
+        "e0_nominal_eV":
+            "Reference nominal edge energy (eV). CAL-EREF's L1 check "
+            "requires mu_ref_e0 - e0_nominal_eV to lie inside "
+            "mono_offset_window_eV. Ni K default = 8333.0.",
+        "e0_alt_eV":
+            "Alternative nominal from the beamline Info.txt "
+            "(8331.90 for this dataset). Documented so the ~1.1 eV "
+            "gap between the two nominals is explicit; use "
+            "e0_nominal_tol_eV to cover the gap.",
+        "e0_nominal_tol_eV":
+            "L2 tolerance (eV): |E0_ref_calibrated - e0_nominal_eV| "
+            "should stay below this value. Set >= 1.5 to cover the "
+            "8333 vs 8331.9 gap.",
+        "mono_offset_window_eV":
+            "L1 window [low, high] eV for mu_ref_e0 - e0_nominal_eV. "
+            "Wide default [-5, 25] permits the ~+13 eV monochromator-scale "
+            "offset observed in this dataset. Out-of-window -> CAL-EREF FAIL.",
+        "ref_e0_search_eV":
+            "Window [low, high] eV where find_e0 searches for the "
+            "reference edge on mu_ref. Should straddle the true "
+            "reference E0 and avoid known pre-edge glitches.",
+        "ref_e0_spread_tol_eV":
+            "L3 tolerance (eV): |mu_ref_e0[k] - median(mu_ref_e0)|. "
+            "The reference foil E0 should be a constant across all "
+            "121 cells; a value above this suggests row-to-row drift.",
+    }
 
 
 def _coerce(raw: str):
