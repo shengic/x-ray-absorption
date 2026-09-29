@@ -11,7 +11,7 @@ and caches results:
 
 where {stem} = "X{j}_{x}_{start}_{end}".
 
-version 1.3 by Albert Sheng
+version 1.4 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -23,10 +23,16 @@ from pathlib import Path
 
 import numpy as np
 
-PIPELINE_VERSION = "1.3"
+PIPELINE_VERSION = "1.4"
 
-DATA_ROOT = Path("data")
-IMAGE_ROOT = Path("image")
+# Anchor output roots to the project directory (the folder containing this
+# file), NOT the shell's current working directory. Keeps behaviour stable
+# when the project is moved between drive letters or launched via a
+# shortcut with a different CWD. Tests monkeypatch these attributes; the
+# attribute lookup is dynamic so overrides still work.
+_PROJECT_ROOT = Path(__file__).resolve().parent
+DATA_ROOT = _PROJECT_ROOT / "data"
+IMAGE_ROOT = _PROJECT_ROOT / "image"
 
 # v1.3: case-insensitive so 'x5_0_...' (see D9) is treated the same as 'X5_0_...'.
 # Output stems are always uppercase (built from parsed j/x), so cache filenames

@@ -1,4 +1,4 @@
-<!-- README.md | version 2.0.7 by Albert Sheng | Config help: non-modal 繁中 panels -->
+<!-- README.md | version 2.0.9 by Albert Sheng | + bootstrap.py + run.bat (drive-letter portable) -->
 
 # NiXZ-121 XANES Analyzer
 
@@ -45,7 +45,32 @@ Ni sample (121 sections total). Pipeline: raw `.txt` →
 
 ## Install
 
-Python 3.11+ (Windows / macOS / Linux).
+Python 3.11+ (Windows / macOS / Linux). Developed and tested on **3.12** —
+the heavy binary dependencies (pyfai, fabio, silx, mkl_fft, deltalake,
+blake3) have the most complete cp312 wheel coverage, so the install stays
+wheel-only with no MSVC toolchain required.
+
+### Preferred: portable one-click launcher
+
+```
+run.bat                 (Windows)
+python bootstrap.py     (any platform)
+```
+
+`bootstrap.py` detects whether `.venv` works, rebuilds it from scratch
+if it doesn't, installs `requirements.txt`, then hands off to `main.py`
+with all remaining argv. Safe to move the project folder between drive
+letters (I: → J:) or between machines — the venv rebuilds automatically
+on the next launch. Subsequent launches are a fast no-op check.
+
+Forwarded CLI examples:
+```
+run.bat --batch image_AI_Ni                  (Windows)
+python bootstrap.py --batch image_AI_Ni      (portable)
+python bootstrap.py --examine image_AI_Ni
+```
+
+### Manual (if you want to control the venv yourself)
 
 ```
 python -m venv .venv
@@ -54,6 +79,8 @@ python -m venv .venv
 
 xraylarch pulls a heavy dependency tree (scipy, lmfit, pymatgen, silx,
 h5py, sqlalchemy, plotly, mkl); first install takes several minutes.
+See sharp edge 9 for the failure modes that make `bootstrap.py`
+worthwhile.
 
 ## Run
 
@@ -122,7 +149,7 @@ Filename stem `X{j}_{x}_{start}_{end}` mirrors the source; folder disambiguates 
   definitions, §5.1 literature review with citations to xraylarch, MBACK,
   TXM-Wizard, Lippold 2005, Gaur 2026, Leys 2013, Stern & Kim 1981;
   §5.1.1 rule-provenance table; §6 MySQL schema; §10 discrepancy log
-  D1–D8).
+  D1–D10, with D5, D8, D9, D10 currently closed).
 - **`doc/TASK_examine_rules.md`** — Phase 2 spec + §12 implementation log
   (assumed vs actual key names, unit choices, Lippold paper reading,
   MySQL deferral, C-CUMDIFF status).
@@ -141,7 +168,9 @@ rules.py               Phase 2: Rule dataclass + REGISTRY + 11 rules + lippold_c
 examine.py             Phase 2: context builder + topological execution + verdict writer
 config.yaml            rules + thresholds + edge config + (disabled) db config
 requirements.txt       numpy, matplotlib, xraylarch, pyyaml, pytest
-test/                  73-test pytest suite
+bootstrap.py           self-healing .venv launcher (drive-letter portable)
+run.bat                Windows one-click entry point calling bootstrap.py
+test/                  83-test pytest suite
 ```
 
 ### Sharp edges (bugs I hit or foresee)
@@ -174,6 +203,25 @@ test/                  73-test pytest suite
    non-PASS, downstream rules return N/A with reason
    `"requires X (disabled)"` or `"requires X (FAIL)"`. Baseline stats
    (median/MAD) use only cells that passed `GATE-EDGE`.
+9. **Never move or re-`venv` an existing `.venv`** — two independent
+   failure modes, and they stack:
+   - Windows console scripts (`pip.exe`, `pytest.exe`) are distlib
+     launchers with the interpreter's *absolute path* baked in. Move the
+     folder (or change drive letter) and every one dies with
+     `Fatal error in launcher: Unable to create process using '"<old
+     path>\python.exe" ...'`.
+   - Re-running `python -m venv .venv` over an existing venv replaces
+     `python.exe` and `pyvenv.cfg` but leaves `site-packages` and the
+     launchers untouched. Do that with a *different* Python and you get
+     3.14 interpreter + cp313 `.pyd` files → `ImportError: No module
+     named 'numpy._core._multiarray_umath'`. `pip install -r
+     requirements.txt` reports `already satisfied` because pip compares
+     metadata versions, not ABI tags of installed files.
+
+   Diagnose with `python -c "import sys; print(sys.version)"` vs
+   `ls .venv/Lib/site-packages/numpy/_core/*.pyd` (the `cpXYZ` tag must
+   match). Fix: delete `.venv` and rebuild. `.venv/` is gitignored and
+   disposable; repairing it is never worth the effort.
 
 ### Adding a new rule
 
