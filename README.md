@@ -1,4 +1,4 @@
-<!-- README.md | version 2.0.9 by Albert Sheng | + bootstrap.py + run.bat (drive-letter portable) -->
+<!-- README.md | version 2.1.0 by Albert Sheng | + main2.py: hover-detail / click-to-plot heatmap GUI -->
 
 # NiXZ-121 XANES Analyzer
 
@@ -37,7 +37,7 @@ Ni sample (121 sections total). Pipeline: raw `.txt` →
   manifest with `config_hash`), `image/**/*.png` (plots). 1-to-1 map onto
   the MySQL schema in `doc/NiXZ-121_project.md` §6 — MySQL wiring deferred
   until the schema is finalized.
-- **Tests** — 83 pytest tests covering regex/naming, discovery, data
+- **Tests** — 89 pytest tests covering regex/naming, discovery, data
   format, pipeline round-trip, metric shapes, cache I/O, GUI smoke,
   examine engine (rules, N/A propagation, config-hash determinism,
   flag combine, lippold_c7 identities, C-CUMDIFF jump detection,
@@ -106,6 +106,25 @@ On launch, pick the dataset root (folder containing
 | **Rule violations** | small-multiples: one 11 × 11 per rule |
 | click any heatmap cell | jump-select the section in the listboxes |
 
+**Alternative GUI — `main2.py` (interactive heatmap)**:
+
+```
+python main2.py
+```
+
+Same pipeline and rule engine (`main2.HoverHeatmapViewer` subclasses
+`main.XANESViewer`, so there is exactly one copy of the algorithm). Only the
+11 × 11 heatmap window differs — it draws the identical image, plus:
+
+| gesture | action |
+|---|---|
+| **move the cursor** over a cell | side panel updates live with that cell's file name, absorption header (E₀ sample/mu_ref, Δμ₀, edge FWHM, pre/post-edge windows, `pre_slope`, `norm_c0/c1/c2`), Q1–Q6, and the examine verdict + flagged rules. Hovered cell gets a blue outline. |
+| **click** a cell | opens the **combined** (pre-edge + normalized) plot window for that cell, and syncs the main window's listboxes and info panel |
+
+Hovering reads only the `data/` cache, so it works before a dataset root is
+picked. Headless flags (`--batch`, `--examine`, `--config`) are delegated to
+`main.py` and behave identically.
+
 **Headless (batch + examine, no GUI)**:
 
 ```
@@ -163,6 +182,7 @@ Filename stem `X{j}_{x}_{start}_{end}` mirrors the source; folder disambiguates 
 
 ```
 main.py                tkinter GUI + --batch / --examine CLI
+main2.py               variant GUI: subclasses main.XANESViewer, hover+click heatmap
 pipeline.py            Phase 1: parse, pre_edge, metrics, cache I/O, figure builders
 rules.py               Phase 2: Rule dataclass + REGISTRY + 11 rules + lippold_c7 helper
 examine.py             Phase 2: context builder + topological execution + verdict writer
@@ -170,7 +190,7 @@ config.yaml            rules + thresholds + edge config + (disabled) db config
 requirements.txt       numpy, matplotlib, xraylarch, pyyaml, pytest
 bootstrap.py           self-healing .venv launcher (drive-letter portable)
 run.bat                Windows one-click entry point calling bootstrap.py
-test/                  83-test pytest suite
+test/                  89-test pytest suite
 ```
 
 ### Sharp edges (bugs I hit or foresee)

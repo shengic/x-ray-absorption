@@ -30,6 +30,9 @@ image.png
 # Copyrighted reference papers -- store locally, cite by DOI in docs
 references/
 
+# Claude Code local machine settings (permissions etc.)
+.claude/settings.local.json
+
 # IDE / OS
 .idea/
 .vscode/
