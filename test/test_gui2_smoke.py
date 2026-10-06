@@ -3,7 +3,7 @@
 `hover_report` is a pure function and is tested without Tk. The viewer and
 `_scan_cells` tests are skipped when no Tk display is available.
 
-version 1.0.0 by Albert Sheng
+version 1.1.0 by Albert Sheng
 """
 from __future__ import annotations
 
@@ -72,11 +72,24 @@ def test_hover_report_lists_flagged_rules():
         },
     }
     txt = main2.hover_report(META, examine)
-    assert "smooth           FAIL (6/6)" in txt
-    assert "FAIL  R-NOISE-HF" in txt
+    assert "smooth\tFAIL (6/6)" in txt
+    assert "FAIL R-NOISE-HF" in txt
     assert "z=+5.40 > fail_z" in txt
     assert "R-GLITCH" not in txt        # N/A is not "flagged"
     assert "GATE-EDGE" not in txt       # PASS is not "flagged"
+
+
+def test_hover_report_uses_tab_stops_not_space_padding():
+    """The GUI renders this in Georgia (proportional), so the value column is
+    aligned by a Tk tab stop. Space padding would look ragged."""
+    import main2
+    txt = main2.hover_report(META, None)
+    for label in ("E0 sample", "edge step dmu0", "Q2 hf noise RMS",
+                  "usable (legacy)"):
+        assert f"{label}\t" in txt
+    # no run of 2+ spaces used as a column separator before a value
+    assert "E0 sample  " not in txt
+    assert main2.REPORT_TAB > 0
 
 
 def test_hover_report_tolerates_legacy_cache():
@@ -90,51 +103,39 @@ def test_hover_report_tolerates_legacy_cache():
     assert "Z6_1/X0_5_1_120_XANES.txt" in txt
 
 
-def test_scan_cells_grid_orientation(tmp_path, monkeypatch):
+def test_scan_cells_grid_orientation(tk_window, tmp_path, monkeypatch):
     """grid[i, 10 - j] must match main.py so the image is identical."""
-    try:
-        root = tk.Tk()
-    except tk.TclError as e:
-        pytest.skip(f"no Tk display available: {e}")
-    try:
-        import main
-        import main2
-        monkeypatch.setattr(main.filedialog, "askdirectory", lambda **kw: "")
-        cache = tmp_path / "data" / "Z6_1"
-        cache.mkdir(parents=True)
-        (cache / "X0_5_1_120.json").write_text(json.dumps(META),
-                                               encoding="utf-8")
-        monkeypatch.setattr(pl, "DATA_ROOT", tmp_path / "data")
+    import main
+    import main2
+    monkeypatch.setattr(main.filedialog, "askdirectory", lambda **kw: "")
+    cache = tmp_path / "data" / "Z6_1"
+    cache.mkdir(parents=True)
+    (cache / "X0_5_1_120.json").write_text(json.dumps(META), encoding="utf-8")
+    monkeypatch.setattr(pl, "DATA_ROOT", tmp_path / "data")
 
-        viewer = main2.HoverHeatmapViewer(root)
-        root.update()
-        grid, labels, index = viewer._scan_cells("edge_step", False)
+    viewer = main2.HoverHeatmapViewer(tk_window)
+    tk_window.update()
+    grid, labels, index = viewer._scan_cells("edge_step", False)
 
-        assert grid.shape == (11, 11)
-        assert grid[6, 10 - 0] == pytest.approx(0.26208)
-        assert labels == {}                       # continuous mode, no text
-        assert (6, 0) in index
-        assert index[(6, 0)]["meta"]["fname"] == "X0_5_1_120_XANES.txt"
-        assert index[(6, 0)]["examine"] is None
-    finally:
-        root.destroy()
+    assert grid.shape == (11, 11)
+    assert grid[6, 10 - 0] == pytest.approx(0.26208)
+    assert labels == {}                       # continuous mode, no text
+    assert (6, 0) in index
+    assert index[(6, 0)]["meta"]["fname"] == "X0_5_1_120_XANES.txt"
+    assert index[(6, 0)]["examine"] is None
 
 
-def test_viewer_instantiates_without_crash(monkeypatch):
-    try:
-        root = tk.Tk()
-    except tk.TclError as e:
-        pytest.skip(f"no Tk display available: {e}")
-    try:
-        import main
-        import main2
-        monkeypatch.setattr(main.filedialog, "askdirectory", lambda **kw: "")
-        viewer = main2.HoverHeatmapViewer(root)
-        root.update()
-        root.update_idletasks()
-        assert viewer.dataset_root is None
-        assert viewer.current_section is None
-        assert viewer._cell_index == {}
-        assert viewer._hover_xz is None
-    finally:
-        root.destroy()
+def test_viewer_instantiates_and_is_georgia(tk_window, monkeypatch):
+    import main
+    import main2
+    monkeypatch.setattr(main.filedialog, "askdirectory", lambda **kw: "")
+    viewer = main2.HoverHeatmapViewer(tk_window)
+    tk_window.update()
+    tk_window.update_idletasks()
+    assert viewer.dataset_root is None
+    assert viewer.current_section is None
+    assert viewer._cell_index == {}
+    assert viewer._hover_xz is None
+    # all-Georgia: the widgets main.py pinned to Consolas are restyled
+    assert "Georgia" in str(viewer.lb_z.cget("font"))
+    assert "Georgia" in str(viewer.info_text.cget("font"))

@@ -1,4 +1,4 @@
-<!-- status.md | version 1.18 by Albert Sheng | 2026-10-06 | 新增 main2.py：hover 顯示細節、click 開 combined 圖的 11×11 熱圖 GUI -->
+<!-- status.md | version 1.19 by Albert Sheng | 2026-10-06 | main2 v1.1.0：combined 視窗加吸收資訊面板；全 GUI 改 Georgia -->
 # NiXZ-121 XANES Viewer — 專案狀態
 
 最後更新：2026-09-27 18:30（UTC+8）　依據：commit `9765ac6`（2026-09-27 06:52）與工作目錄現況
@@ -13,17 +13,17 @@
 |---|---|
 | `doc/NiXZ-121_project.md` | 1.4.4 |
 | `doc/TASK_examine_rules.md` | 1.4 |
-| `doc/status.md` | 1.18 |
+| `doc/status.md` | 1.19 |
 | `CLAUDE.md` | 1.1 |
-| `README.md` | 2.1.0 |
+| `README.md` | 2.1.1 |
 | `main.py` | 1.10 |
-| `main2.py` | 1.0.0 |
+| `main2.py` | 1.1.0 |
 | `pipeline.py` | 1.4 |
 | `rules.py` | 1.3.1 |
 | `examine.py` | 1.2.0 |
 | `config.yaml` | 1.3.0 |
 
-測試：89/89 通過（+6：`test_gui2_smoke.py` — main2 匯入與繼承關係、`hover_report()` 三種情境、`_scan_cells` 方位與索引）。
+測試：90/90 通過（+7：`test_gui2_smoke.py` — main2 匯入與繼承關係、`hover_report()` 四種情境（含 tab stop 對齊約定）、`_scan_cells` 方位與索引）。
 
 ---
 
@@ -42,7 +42,7 @@
 | C-CUMDIFF | 已實作，預設停用 |
 | T-DRIFT、T-UPDOWN、T-OUTLIER-SCAN、T-SATURATION | 預留，未實作（需 `.bin` 逐條光譜） |
 
-- `main2.py` v1.0.0：第二套 GUI（繼承 `main.XANESViewer`，演算法不複製）。11×11 熱圖加上 hover 即時顯示該格檔名／吸收標頭／Q1–Q6／examine 判定，click 直接開 combined 圖並同步主視窗選取。
+- `main2.py` v1.1.0：第二套 GUI（繼承 `main.XANESViewer`，演算法不複製）。11×11 熱圖加上 hover 即時顯示該格檔名／吸收標頭／Q1–Q6／examine 判定，click 直接開 combined 圖（圖旁同時附上同一份吸收資訊面板）並同步主視窗選取。全 GUI 字型為 Georgia。
 - 知識庫移至 `doc/`，`CLAUDE.md` 以 `@doc/...` 自動載入。
 - `NiXZ-121_Report.docx`：技術報告（Part I，journal-style）+ 使用手冊（Part II），共 130 段、6 表、9 條 OMML 顯示公式、38 標題。由 `build_report.py` 產生（用 python-docx + OMML XML 注入方式產生 Word 原生數學式）。字型設定：正文 Georgia，中文 eastAsia 掛標楷體，程式碼 Consolas。
 - v1.4 (main.py) 將 `Rules...` 與 `Edge...` 合併為單一 **`Config...`** 按鈕；Toplevel 內含 `ttk.Notebook` 兩分頁（Rules / Edge），共用 Save-to-yaml checkbox + Apply & Examine + Close。刪除 `show_rules_panel`、`show_edge_panel`、兩份 `_apply_*` 與 `rules_window`、`edge_window` 等狀態欄位（-30 行）。校準時可一次動兩區、跑一次 Examine。
@@ -96,6 +96,7 @@
 
 | 版本 | 日期 | 內容 |
 |---|---|---|
+| 1.19 | 2026-10-06 | `main2.py` v1.0.0 → **1.1.0**。(1) **combined 視窗加吸收資訊面板**：覆寫 `_open_plot()`，`kind == "combined"` 時改用 `ttk.PanedWindow` 左圖右文，右側 `X-ray absorption info` 面板顯示與 hover 完全相同的 `hover_report()` 內容（含捲軸）；pre-edge／normalized 兩個視窗仍走 `super()`，行為不變。因為是覆寫 `_open_plot`，主視窗的 **Both plots (combined)** 按鈕也一併享有這個面板。視窗預設 1680×620，僅在新建時設定，不覆蓋使用者調過的大小。(2) **全 GUI 改 Georgia**：`_apply_georgia()` 重設 Tk 的 **named fonts**（`TkDefaultFont`／`TkTextFont`／`TkMenuFont`／`TkHeadingFont`／`TkFixedFont`），因此 ttk 元件、Config 面板的底線說明連結（`_link_label` 由 `TkDefaultFont` 衍生）、`("TkDefaultFont", 9, "bold")` 標題全部跟著變；另手動覆寫 main.py 寫死 `("Consolas", 10)` 的 `lb_z`／`lb_x`／`info_text`；matplotlib 以 `rcParams["font.family"]` 統一。`main.py` **完全未改**，舊 GUI 維持 Consolas。(3) Georgia 是比例字體，空白填充不會對齊，因此 `hover_report()` 改以 `label\tvalue` 輸出，Text widget 設 `tabs=(REPORT_TAB,)`（150 px）對齊值欄。**已知取捨**：Examine 121 結果視窗的 ASCII bar chart 以空白排版，改 Georgia 後會參差（移除 `_open_examine_results` 覆寫即可還原該視窗）；從 main2 跑 batch 產生的 `image/**/*.png` 標籤字型也會是 Georgia。新增 1 測試（tab stop 約定），90/90 通過。已 headless 驅動驗證：點 (0,0) 開出 Combined 視窗 1680×620，面板內容為 `Z5_0/X5_0_668_788_XANES.txt` 全報告；Tk named fonts 與 matplotlib 皆為 Georgia。(4) **修掉自己弄出來的 flaky test**：新增的 GUI 測試讓同一 process 內出現 3 個 `tk.Tk()` root，Windows 上第二、三個會間歇性失敗（`Can't find a usable tk.tcl`，實測 5 跑 3 次 skip）。`test/conftest.py` v1.0 → 1.1 改為提供 session 範圍的 `tk_app`（唯一 Tk root，`withdraw()`）與每測試一個的 `tk_window`（`Toplevel`，`XANESViewer` 只用到 title/geometry/protocol/after，`Toplevel` 均支援）；`test_gui_smoke.py` v1.0 → 1.1、`test_gui2_smoke.py` v1.0.0 → 1.1.0 改用該 fixture。修正後連跑 6 次均 90/90。README.md v2.1.0 → 2.1.1、test/README.md v1.2 → 1.3。 |
 | 1.18 | 2026-10-06 | 新增 **`main2.py`**（v1.0.0）：第二套 GUI，`HoverHeatmapViewer` **繼承** `main.XANESViewer`，演算法與 pipeline／規則引擎完全共用（不複製），只改 11×11 熱圖視窗。熱圖本身畫得與 `main.py` 一模一樣（同樣的 `grid[i, 10-j]`、`origin="lower"`、`extent=(-5.5, 5.5, -5.5, 5.5)`、同樣的 flag 文字疊層），另加兩項互動：**滑鼠移過任一格** → 右側面板即時顯示該格檔名、吸收標頭（E₀ sample／mu_ref、Δμ₀、edge FWHM、pre／post-edge 視窗、`pre_slope`、`norm_c0/c1/c2`）、Q1–Q6 與 examine 判定＋被旗標的規則，滑過的格子加藍框；**點擊任一格** → 開該格的 **combined**（pre-edge ＋ normalized 並排）圖視窗，同時把主視窗的 Z／X 清單與 info 面板同步過去。hover 只讀 `data/` 快取，未選 dataset root 也能用；點擊時若主視窗尚未載入 root，會改用快取 meta 重建 `pl.Section` 直接出圖。`hover_report()` 寫成模組層級純函式以利單元測試。headless 旗標（`--batch`／`--examine`／`--config`）直接委派給 `main.py`，行為不變。新增 `test/test_gui2_smoke.py` 6 測試（89/89 通過）。已以真實 121 格快取 headless 驅動驗證 hover／click 與座標對應（(+5,+1)→Z6_1/X0_5、(0,0)→Z5_0/X5_0、(−5,−5)→Z0_-5/X10_-5，符合 project.md §2）。README.md v2.0.9 → 2.1.0、test/README.md v1.1 → 1.2。 |
 | 1.17 | 2026-09-29 | **跨磁碟可攜性**：新增 `bootstrap.py`（v1.0）與 Windows `run.bat`（v1.0）。`bootstrap.py` 開機時檢查 `.venv` 是否可用（能執行 python + 有 numpy/matplotlib/larch），失敗即整個刪除重建並自動 `pip install -r requirements.txt`，然後才 hand off 到 `main.py` 並轉發 argv。這是為了應付把整個專案硬碟移到不同磁碟代號（I: → J:）或不同機器時，`.venv\Scripts\*.exe` 這些 compiled launcher 因為烙印絕對路徑而全部壞掉的情況。`pipeline.py` v1.3 → 1.4：`DATA_ROOT` / `IMAGE_ROOT` 錨定到 `Path(__file__).resolve().parent` 而非 CWD，`python main.py` 從任何 cwd 執行結果都一致。README.md v2.0.8 → 2.0.9：新增 "Preferred: portable one-click launcher" 章節、`§Project docs` 的 discrepancy log 由 `D1-D8` 更新為 `D1-D10`（D5/D8/D9/D10 已結案）、`§Repository layout` 加入 bootstrap.py + run.bat。順手修正 §1 兩個 stale 版本（status.md 1.3 → 1.17；README.md 2.0.3 → 2.0.9）。 |
 | 1.15 | 2026-09-28 | 對照 `doc/NiXZ-121_project.md §9`（權威來源）重新核對 `build_report.py` 的 References 條目：**[4] MBACK** 補回標題末的 "(MBACK)"（原被誤刪）；**[8] Stern & Kim** 頁碼由臆造的 `3781–3787` 修正為 `3781`（project.md 為準）。"Note on source verification" 段改寫得更精確：分三層（已讀全文、書目確認未逐字核對、abstract 級待外部核對），[6] Gaur 2026 DOI 的 `026` 年份編碼吻合 Scientific Data 慣例但 serial 未獨立驗證。build_report.py v1.2 → 1.3。Word 檔待使用者關閉 Word 後手動 `python build_report.py` 重生。 |

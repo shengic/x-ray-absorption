@@ -1,6 +1,6 @@
 """Shared pytest fixtures and sys.path setup.
 
-version 1.0 by Albert Sheng
+version 1.1 by Albert Sheng (session-wide Tk root fixtures)
 """
 from __future__ import annotations
 
@@ -40,6 +40,41 @@ def sample_txt(data_root) -> Path:
         if pl.FNAME_RE.match(txt.name):
             return txt
     pytest.skip(f"no XANES sample found under {data_root}")
+
+
+@pytest.fixture(scope="session")
+def tk_app():
+    """One Tk interpreter for the whole session.
+
+    Creating and destroying several `tk.Tk()` roots in a single process is
+    unreliable on Windows -- a later root intermittently fails with
+    "Can't find a usable tk.tcl". The GUI tests therefore share this root and
+    take a fresh Toplevel each (see `tk_window`)."""
+    tk = pytest.importorskip("tkinter")
+    try:
+        root = tk.Tk()
+    except tk.TclError as e:
+        pytest.skip(f"no Tk display available: {e}")
+    root.withdraw()
+    yield root
+    try:
+        root.destroy()
+    except Exception:
+        pass
+
+
+@pytest.fixture
+def tk_window(tk_app):
+    """A fresh, hidden Toplevel to host one viewer. XANESViewer only needs
+    title/geometry/protocol/after, all of which a Toplevel provides."""
+    import tkinter as tk
+    win = tk.Toplevel(tk_app)
+    win.withdraw()
+    yield win
+    try:
+        win.destroy()
+    except Exception:
+        pass
 
 
 @pytest.fixture

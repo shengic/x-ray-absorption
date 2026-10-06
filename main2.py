@@ -9,14 +9,19 @@ there is exactly one copy of the algorithm). Only the heatmap window differs:
     absorption header (E0, edge step, pre/post-edge windows, larch
     normalization coefficients) and Q1-Q6 + examine verdicts, live
   * CLICK a cell            -> opens the combined (pre-edge + normalized)
-    plot window for that cell, and syncs the main window's listboxes
+    plot window for that cell, with the same absorption info shown beside
+    the figure, and syncs the main window's listboxes
+
+All text is set in Georgia (GUI widgets and matplotlib figures alike).
+Because Georgia is proportional, the report aligns its value column with a
+Tk tab stop rather than space padding.
 
 Run:
     python main2.py                          # GUI
     python main2.py --batch image_AI_Ni      # headless, delegates to main.py
     python main2.py --examine image_AI_Ni
 
-version 1.0.0 by Albert Sheng
+version 1.1.0 by Albert Sheng
 """
 
 from __future__ import annotations
@@ -24,11 +29,12 @@ from __future__ import annotations
 import json
 import sys
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 import numpy as np
 
 try:
+    import matplotlib
     from matplotlib.backends.backend_tkagg import (
         FigureCanvasTkAgg,
         NavigationToolbar2Tk,
@@ -40,6 +46,14 @@ except ImportError:
 
 import main as base
 import pipeline as pl
+
+# Every bit of text in this GUI is Georgia -- Tk widgets and figures alike.
+UI_FONT = ("Georgia", 10)
+REPORT_FONT = ("Georgia", 10)
+#: Tk tab stop (pixels) that the report's value column lines up on. Georgia is
+#: proportional, so space padding would not align.
+REPORT_TAB = 150
+matplotlib.rcParams["font.family"] = "Georgia"
 
 
 # --------------------------------------------------------------------------
@@ -57,38 +71,43 @@ def _fmt(value, spec: str = ".4f", na: str = "n/a") -> str:
 
 
 def hover_report(meta: dict, examine: dict | None) -> str:
-    """Build the text shown while the cursor sits over a heatmap cell.
+    """Build the text shown while the cursor sits over a heatmap cell, and
+    beside the combined plot window.
 
     `meta` is the pipeline cache `data/{Zdir}/{stem}.json`; `examine` is the
-    matching `.examine.json`, or None when Examine has not been run."""
+    matching `.examine.json`, or None when Examine has not been run.
+
+    Label and value are separated by a tab, not by space padding: the GUI
+    renders this in Georgia (proportional), so the value column is aligned by
+    a Tk tab stop (`REPORT_TAB`) instead."""
     g = meta.get
     lines = [
         f"{g('zdir')}/{g('fname')}",
         f"(i, j) = ({g('i')}, {g('j')})"
         f"    (x, z) = ({g('x'):+d}, {g('z'):+d})",
-        f"segment  {g('seg_start')} - {g('seg_end')}",
+        f"segment\t{g('seg_start')} - {g('seg_end')}",
         "",
         "-- absorption header --",
-        f"E0 sample        {_fmt(g('e0'), '.2f')} eV",
-        f"E0 mu_ref        {_fmt(g('mu_ref_e0'), '.2f')} eV",
-        f"edge step dmu0   {_fmt(g('edge_step'))}",
-        f"edge FWHM        {_fmt(g('edge_fwhm_eV'), '.2f')} eV",
-        f"pre-edge win     E0{_fmt(g('pre1'), '+.1f')}"
+        f"E0 sample\t{_fmt(g('e0'), '.2f')} eV",
+        f"E0 mu_ref\t{_fmt(g('mu_ref_e0'), '.2f')} eV",
+        f"edge step dmu0\t{_fmt(g('edge_step'))}",
+        f"edge FWHM\t{_fmt(g('edge_fwhm_eV'), '.2f')} eV",
+        f"pre-edge win\tE0{_fmt(g('pre1'), '+.1f')}"
         f" .. E0{_fmt(g('pre2'), '+.1f')} eV",
-        f"post-edge win    E0{_fmt(g('norm1'), '+.1f')}"
+        f"post-edge win\tE0{_fmt(g('norm1'), '+.1f')}"
         f" .. E0{_fmt(g('norm2'), '+.1f')} eV  (nnorm={g('nnorm')})",
-        f"pre slope        {_fmt(g('pre_slope'), '.3e')}",
-        f"norm c0/c1/c2    {_fmt(g('norm_c0'), '.3e')}"
+        f"pre slope\t{_fmt(g('pre_slope'), '.3e')}",
+        f"norm c0/c1/c2\t{_fmt(g('norm_c0'), '.3e')}"
         f"  {_fmt(g('norm_c1'), '.3e')}  {_fmt(g('norm_c2'), '.3e')}",
         "",
         "-- quality metrics --",
-        f"Q1 edge step     {_fmt(g('q1_edge_step'))}",
-        f"Q2 hf noise RMS  {_fmt(g('q2_hf_noise'), '.5f')}",
-        f"Q3 pre-edge flat {_fmt(g('q3_pre_flatness'), '.5f')}",
-        f"Q4 E0 vs ref     {_fmt(g('q4_e0_shift_vs_ref'), '+.2f')} eV",
-        f"Q5 glitches      {g('q5_glitches')}",
-        f"Q6 white line    {_fmt(g('q6_white_line'), '.3f')}",
-        f"usable (legacy)  {'YES' if g('usable') else 'NO'}",
+        f"Q1 edge step\t{_fmt(g('q1_edge_step'))}",
+        f"Q2 hf noise RMS\t{_fmt(g('q2_hf_noise'), '.5f')}",
+        f"Q3 pre-edge flat\t{_fmt(g('q3_pre_flatness'), '.5f')}",
+        f"Q4 E0 vs ref\t{_fmt(g('q4_e0_shift_vs_ref'), '+.2f')} eV",
+        f"Q5 glitches\t{g('q5_glitches')}",
+        f"Q6 white line\t{_fmt(g('q6_white_line'), '.3f')}",
+        f"usable (legacy)\t{'YES' if g('usable') else 'NO'}",
     ]
 
     if examine is None:
@@ -99,11 +118,11 @@ def hover_report(meta: dict, examine: dict | None) -> str:
     lines += [
         "",
         "-- examine (rule-based) --",
-        f"smooth           {e('smooth')} "
+        f"smooth\t{e('smooth')} "
         f"({e('smooth_evaluated', 0)}/{e('smooth_enabled', 0)})",
-        f"consistent       {e('consistent')} "
+        f"consistent\t{e('consistent')} "
         f"({e('consistent_evaluated', 0)}/{e('consistent_enabled', 0)})",
-        f"usable           {'YES' if e('usable') else 'NO'}",
+        f"usable\t{'YES' if e('usable') else 'NO'}",
     ]
     flagged = [(rid, r) for rid, r in examine.get("rules", {}).items()
                if r.get("level_name") in ("WARN", "FAIL")]
@@ -113,11 +132,10 @@ def hover_report(meta: dict, examine: dict | None) -> str:
         for rid, r in flagged:
             val = r.get("value")
             tail = "" if val is None else f"  value={_fmt(val, '.4g')}"
-            lines.append(f"{r['level_name']:<5} {rid}{tail}")
+            lines.append(f"{r['level_name']} {rid}{tail}")
             if r.get("reason"):
-                lines.append(f"      {r['reason']}")
+                lines.append(f"\t{r['reason']}")
     return "\n".join(lines)
-
 
 # --------------------------------------------------------------------------
 # GUI
@@ -136,6 +154,50 @@ class HoverHeatmapViewer(base.XANESViewer):
         self.hover_text: tk.Text | None = None
         self._heatmap_canvas = None     # set by _refresh_heatmap
         self._heatmap_ax = None
+        self.combined_info_text: tk.Text | None = None
+        self._apply_georgia()
+
+    def _apply_georgia(self) -> None:
+        """Put every widget in Georgia, including the ones main.py built.
+
+        Retargeting Tk's *named* fonts does most of the work: it cascades to
+        ttk widgets, to `_link_label`'s underlined links and to the bold
+        `("TkDefaultFont", 9, "bold")` headers, all of which derive from them.
+        Only the three widgets main.py pins to a literal ("Consolas", 10) need
+        setting by hand. main.py itself is untouched -- its own GUI keeps
+        Consolas; this applies to the main2 process only."""
+        from tkinter import font as tkfont
+
+        for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont",
+                     "TkHeadingFont", "TkTooltipFont", "TkFixedFont"):
+            try:
+                tkfont.nametofont(name).configure(family=UI_FONT[0])
+            except tk.TclError:
+                pass                                   # font not defined here
+        self.root.option_add("*Font", UI_FONT)
+        style = ttk.Style()
+        style.configure(".", font=UI_FONT)
+        style.configure("TLabelframe.Label", font=UI_FONT)
+        style.configure("TNotebook.Tab", font=UI_FONT)
+
+        for widget in (getattr(self, "lb_z", None), getattr(self, "lb_x", None)):
+            if widget is not None:
+                widget.configure(font=UI_FONT)
+        if getattr(self, "info_text", None) is not None:
+            self.info_text.configure(font=REPORT_FONT)
+
+    def _open_examine_results(self, run) -> None:
+        """main.py pins this window's Text to ("Consolas", 10); restyle it so
+        main2 stays all-Georgia. Its ASCII bar chart is built from space
+        padding, so it goes ragged in a proportional font -- that is the one
+        place where all-Georgia costs alignment."""
+        super()._open_examine_results(run)
+        win = self.examine_results_window
+        if win is None or not win.winfo_exists():
+            return
+        for child in win.winfo_children():
+            if isinstance(child, tk.Text):
+                child.configure(font=REPORT_FONT)
 
     # ---------------- heatmap ----------------
 
@@ -209,7 +271,8 @@ class HoverHeatmapViewer(base.XANESViewer):
         pane.add(right, weight=2)
 
         self.hover_text = tk.Text(right, wrap=tk.NONE, width=46, height=30,
-                                  font=("Consolas", 9), state=tk.DISABLED)
+                                  font=REPORT_FONT, tabs=(REPORT_TAB,),
+                                  state=tk.DISABLED)
         self.hover_text.pack(fill=tk.BOTH, expand=True)
         ttk.Label(right, foreground="gray",
                   text="move the cursor over a cell for details\n"
@@ -338,6 +401,67 @@ class HoverHeatmapViewer(base.XANESViewer):
                 seg_start=m["seg_start"], seg_end=m["seg_end"],
             )
         self.show_combined()
+
+    # ---------------- combined plot window, with info beside it ----------
+
+    def _open_plot(self, kind: str):
+        """Same singleton plot windows as main.py, except that the combined
+        window carries the cell's absorption info next to the figure.
+        Pre-edge / normalized windows are untouched."""
+        if kind != "combined":
+            return super()._open_plot(kind)
+
+        sec = self.current_section
+        if sec is None:
+            return
+        bundle = pl.cache_bundle(sec)
+        if bundle is None:
+            messagebox.showerror("Cache missing",
+                                 "Cache not found. Click Reprocess.")
+            return
+        fig = pl.plot_combined_fig(bundle, f"{sec.stem} — Ni K-edge")
+
+        win = self.plot_windows.get(kind)
+        fresh = win is None or not win.winfo_exists()
+        if fresh:
+            win = tk.Toplevel(self.root)
+            self.plot_windows[kind] = win
+        else:
+            for child in win.winfo_children():
+                child.destroy()
+        win.title(f"Combined — {sec.zdir}/{sec.stem}")
+        if fresh:
+            win.geometry("1680x620")      # only on creation; keep user resizes
+
+        pane = ttk.PanedWindow(win, orient=tk.HORIZONTAL)
+        pane.pack(fill=tk.BOTH, expand=True)
+        left = ttk.Frame(pane)
+        right = ttk.LabelFrame(pane, text="X-ray absorption info", padding=6)
+        pane.add(left, weight=4)
+        pane.add(right, weight=1)
+
+        canvas = FigureCanvasTkAgg(fig, master=left)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        NavigationToolbar2Tk(canvas, left).update()
+
+        scroll = ttk.Scrollbar(right, orient=tk.VERTICAL)
+        scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        info = tk.Text(right, wrap=tk.NONE, width=46, font=REPORT_FONT,
+                       tabs=(REPORT_TAB,), yscrollcommand=scroll.set)
+        info.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scroll.configure(command=info.yview)
+
+        meta = pl.load_meta(sec)
+        body = (hover_report(meta, self._load_examine_for_current())
+                if meta is not None
+                else f"{sec.zdir}/{sec.fname}\n\nno cached metrics "
+                     f"(.json missing) — click Reprocess")
+        info.insert(tk.END, body)
+        info.configure(state=tk.DISABLED)
+        self.combined_info_text = info
+
+        win.lift()
 
 
 def main() -> int:

@@ -2,7 +2,7 @@
 
 Skipped if matplotlib / Tk display is not available.
 
-version 1.0 by Albert Sheng
+version 1.1 by Albert Sheng (use shared tk_window fixture)
 """
 from __future__ import annotations
 
@@ -37,21 +37,17 @@ def test_xanes_viewer_class_init_signature():
     assert "root" in sig.parameters
 
 
-def test_viewer_instantiates_without_crash(monkeypatch):
-    """Instantiate the viewer, cancel the directory dialog immediately, then destroy."""
-    try:
-        root = tk.Tk()
-    except tk.TclError as e:
-        pytest.skip(f"no Tk display available: {e}")
-    try:
-        import main
-        # Cancel the auto-prompted folder dialog so no user interaction is needed
-        monkeypatch.setattr(main.filedialog, "askdirectory", lambda **kw: "")
-        viewer = main.XANESViewer(root)
-        # Let scheduled after() callbacks fire
-        root.update()
-        root.update_idletasks()
-        assert viewer.dataset_root is None  # cancelled dialog
-        assert viewer.current_section is None
-    finally:
-        root.destroy()
+def test_viewer_instantiates_without_crash(tk_window, monkeypatch):
+    """Instantiate the viewer and cancel the directory dialog immediately.
+
+    `tk_window` is a Toplevel on the session-wide Tk root (see conftest) --
+    creating a second `tk.Tk()` here made the suite flaky on Windows."""
+    import main
+    # Cancel the auto-prompted folder dialog so no user interaction is needed
+    monkeypatch.setattr(main.filedialog, "askdirectory", lambda **kw: "")
+    viewer = main.XANESViewer(tk_window)
+    # Let scheduled after() callbacks fire
+    tk_window.update()
+    tk_window.update_idletasks()
+    assert viewer.dataset_root is None  # cancelled dialog
+    assert viewer.current_section is None

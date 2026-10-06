@@ -1,4 +1,4 @@
-<!-- README.md | version 2.1.0 by Albert Sheng | + main2.py: hover-detail / click-to-plot heatmap GUI -->
+<!-- README.md | version 2.1.1 by Albert Sheng | main2: info panel beside combined plots; all-Georgia -->
 
 # NiXZ-121 XANES Analyzer
 
@@ -37,7 +37,7 @@ Ni sample (121 sections total). Pipeline: raw `.txt` →
   manifest with `config_hash`), `image/**/*.png` (plots). 1-to-1 map onto
   the MySQL schema in `doc/NiXZ-121_project.md` §6 — MySQL wiring deferred
   until the schema is finalized.
-- **Tests** — 89 pytest tests covering regex/naming, discovery, data
+- **Tests** — 90 pytest tests covering regex/naming, discovery, data
   format, pipeline round-trip, metric shapes, cache I/O, GUI smoke,
   examine engine (rules, N/A propagation, config-hash determinism,
   flag combine, lippold_c7 identities, C-CUMDIFF jump detection,
@@ -119,11 +119,29 @@ Same pipeline and rule engine (`main2.HoverHeatmapViewer` subclasses
 | gesture | action |
 |---|---|
 | **move the cursor** over a cell | side panel updates live with that cell's file name, absorption header (E₀ sample/mu_ref, Δμ₀, edge FWHM, pre/post-edge windows, `pre_slope`, `norm_c0/c1/c2`), Q1–Q6, and the examine verdict + flagged rules. Hovered cell gets a blue outline. |
-| **click** a cell | opens the **combined** (pre-edge + normalized) plot window for that cell, and syncs the main window's listboxes and info panel |
+| **click** a cell | opens the **combined** (pre-edge + normalized) plot window for that cell — with the *same* absorption info shown in a panel beside the figure — and syncs the main window's listboxes and info panel |
 
 Hovering reads only the `data/` cache, so it works before a dataset root is
 picked. Headless flags (`--batch`, `--examine`, `--config`) are delegated to
 `main.py` and behave identically.
+
+**Typography** — `main2.py` sets everything in **Georgia**: Tk's named fonts
+(which cascades to ttk widgets, the Config panel's underlined help links and
+the bold headers), the listboxes and info panels, and matplotlib figures via
+`rcParams["font.family"]`. `main.py` is untouched and keeps Consolas.
+
+Two consequences worth knowing:
+
+- Georgia is proportional, so the report aligns its value column with a Tk
+  **tab stop** (`main2.REPORT_TAB`) rather than space padding. `hover_report()`
+  emits `label\tvalue` for this reason — keep the tab if you edit it.
+- The **Examine 121** results window draws an ASCII bar chart out of space
+  padding, so it goes ragged in Georgia. That is the one place all-Georgia
+  costs alignment; revert just that window by dropping the
+  `_open_examine_results` override in `main2.py`.
+- Running **Process all (batch)** from `main2.py` writes the cached
+  `image/**/*.png` with Georgia labels (same data, different typeface than
+  PNGs generated from `main.py`).
 
 **Headless (batch + examine, no GUI)**:
 
@@ -190,7 +208,7 @@ config.yaml            rules + thresholds + edge config + (disabled) db config
 requirements.txt       numpy, matplotlib, xraylarch, pyyaml, pytest
 bootstrap.py           self-healing .venv launcher (drive-letter portable)
 run.bat                Windows one-click entry point calling bootstrap.py
-test/                  89-test pytest suite
+test/                  90-test pytest suite
 ```
 
 ### Sharp edges (bugs I hit or foresee)
