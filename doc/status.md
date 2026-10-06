@@ -1,4 +1,4 @@
-<!-- status.md | version 1.19 by Albert Sheng | 2026-10-06 | main2 v1.1.0：combined 視窗加吸收資訊面板；全 GUI 改 Georgia -->
+<!-- status.md | version 1.20 by Albert Sheng | 2026-10-06 | 記錄決定：其餘 smooth 規則 z 門檻維持現狀不校準 -->
 # NiXZ-121 XANES Viewer — 專案狀態
 
 最後更新：2026-09-27 18:30（UTC+8）　依據：commit `9765ac6`（2026-09-27 06:52）與工作目錄現況
@@ -13,7 +13,7 @@
 |---|---|
 | `doc/NiXZ-121_project.md` | 1.4.4 |
 | `doc/TASK_examine_rules.md` | 1.4 |
-| `doc/status.md` | 1.19 |
+| `doc/status.md` | 1.20 |
 | `CLAUDE.md` | 1.1 |
 | `README.md` | 2.1.1 |
 | `main.py` | 1.10 |
@@ -65,7 +65,8 @@
 | ~~1~~ | ~~修正 D9（檔名大小寫），重跑 Process all + Examine，確認 121/121~~ | ~~CLI~~ **已完成 2026-09-27** |
 | ~~2~~ | ~~commit `test/` 下 3 個未提交檔~~ | ~~CLI~~ **已完成 2026-09-27** |
 | ~~1~~ | ~~以 121 格實際分佈校準 R-EDGE-FWHM、R-NORM-COEFS 及 z 門檻~~ | ~~使用者＋規劃端~~ **已完成 2026-09-28**（D8 保留 [0.10, 1.5]；D10 兩規則 z 改為 [2.5, 4]） |
-| 1 | 其餘 smooth／consistent 規則的 z 門檻（R-SNR、R-NOISE-HF、R-PRE-FLAT、R-GLITCH、C-SHAPE、C-E0-NBR）是否也要由 121 分佈校準 | 使用者決定 |
+| ~~1~~ | ~~其餘 **smooth** 規則的 z 門檻（R-SNR、R-NOISE-HF、R-PRE-FLAT、R-GLITCH）是否由 121 分佈校準~~ | ~~使用者決定~~ **已決定 2026-10-06：維持現狀，不校準**（沿用 config.yaml 的 `warn_z: 3, fail_z: 5`） |
+| 1 | **consistent** 規則的 z 門檻（C-SHAPE、C-E0-NBR）是否由 121 分佈校準 | 使用者決定（尚未表態） |
 | 2 | 確認 `.bin` 格式後實作 T-* 規則 | 待資料（project.md §8 #2） |
 | 3 | MySQL 接線（`db.enabled: false`） | 待 schema 定稿 |
 | 4 | `combine_mode: weighted`（目前拋 NotImplementedError） | 未排程 |
@@ -96,6 +97,7 @@
 
 | 版本 | 日期 | 內容 |
 |---|---|---|
+| 1.20 | 2026-10-06 | 記錄使用者決定：其餘 **smooth** 規則（`R-SNR`、`R-NOISE-HF`、`R-PRE-FLAT`、`R-GLITCH`）的 z 門檻 **維持現狀，不以 121 格分佈校準**，繼續沿用 `config.yaml` 的 `warn_z: 3, fail_z: 5`。程式與 `config.yaml` **未做任何修改**，本次僅更新 §4 待辦表。需知悉的後果：D10 已證實 `fail_z=5` 對近 Gaussian 分佈幾乎永不觸發（5σ P<6e−7），同樣的特性適用於這四條規則，即它們的 FAIL 實質上仍是裝飾、實際判定只剩 WARN；使用者已知悉並選擇不變。**consistent** 兩條（`C-SHAPE`、`C-E0-NBR`）本次未表態，依舊列為待決定。 |
 | 1.19 | 2026-10-06 | `main2.py` v1.0.0 → **1.1.0**。(1) **combined 視窗加吸收資訊面板**：覆寫 `_open_plot()`，`kind == "combined"` 時改用 `ttk.PanedWindow` 左圖右文，右側 `X-ray absorption info` 面板顯示與 hover 完全相同的 `hover_report()` 內容（含捲軸）；pre-edge／normalized 兩個視窗仍走 `super()`，行為不變。因為是覆寫 `_open_plot`，主視窗的 **Both plots (combined)** 按鈕也一併享有這個面板。視窗預設 1680×620，僅在新建時設定，不覆蓋使用者調過的大小。(2) **全 GUI 改 Georgia**：`_apply_georgia()` 重設 Tk 的 **named fonts**（`TkDefaultFont`／`TkTextFont`／`TkMenuFont`／`TkHeadingFont`／`TkFixedFont`），因此 ttk 元件、Config 面板的底線說明連結（`_link_label` 由 `TkDefaultFont` 衍生）、`("TkDefaultFont", 9, "bold")` 標題全部跟著變；另手動覆寫 main.py 寫死 `("Consolas", 10)` 的 `lb_z`／`lb_x`／`info_text`；matplotlib 以 `rcParams["font.family"]` 統一。`main.py` **完全未改**，舊 GUI 維持 Consolas。(3) Georgia 是比例字體，空白填充不會對齊，因此 `hover_report()` 改以 `label\tvalue` 輸出，Text widget 設 `tabs=(REPORT_TAB,)`（150 px）對齊值欄。**已知取捨**：Examine 121 結果視窗的 ASCII bar chart 以空白排版，改 Georgia 後會參差（移除 `_open_examine_results` 覆寫即可還原該視窗）；從 main2 跑 batch 產生的 `image/**/*.png` 標籤字型也會是 Georgia。新增 1 測試（tab stop 約定），90/90 通過。已 headless 驅動驗證：點 (0,0) 開出 Combined 視窗 1680×620，面板內容為 `Z5_0/X5_0_668_788_XANES.txt` 全報告；Tk named fonts 與 matplotlib 皆為 Georgia。(4) **修掉自己弄出來的 flaky test**：新增的 GUI 測試讓同一 process 內出現 3 個 `tk.Tk()` root，Windows 上第二、三個會間歇性失敗（`Can't find a usable tk.tcl`，實測 5 跑 3 次 skip）。`test/conftest.py` v1.0 → 1.1 改為提供 session 範圍的 `tk_app`（唯一 Tk root，`withdraw()`）與每測試一個的 `tk_window`（`Toplevel`，`XANESViewer` 只用到 title/geometry/protocol/after，`Toplevel` 均支援）；`test_gui_smoke.py` v1.0 → 1.1、`test_gui2_smoke.py` v1.0.0 → 1.1.0 改用該 fixture。修正後連跑 6 次均 90/90。README.md v2.1.0 → 2.1.1、test/README.md v1.2 → 1.3。 |
 | 1.18 | 2026-10-06 | 新增 **`main2.py`**（v1.0.0）：第二套 GUI，`HoverHeatmapViewer` **繼承** `main.XANESViewer`，演算法與 pipeline／規則引擎完全共用（不複製），只改 11×11 熱圖視窗。熱圖本身畫得與 `main.py` 一模一樣（同樣的 `grid[i, 10-j]`、`origin="lower"`、`extent=(-5.5, 5.5, -5.5, 5.5)`、同樣的 flag 文字疊層），另加兩項互動：**滑鼠移過任一格** → 右側面板即時顯示該格檔名、吸收標頭（E₀ sample／mu_ref、Δμ₀、edge FWHM、pre／post-edge 視窗、`pre_slope`、`norm_c0/c1/c2`）、Q1–Q6 與 examine 判定＋被旗標的規則，滑過的格子加藍框；**點擊任一格** → 開該格的 **combined**（pre-edge ＋ normalized 並排）圖視窗，同時把主視窗的 Z／X 清單與 info 面板同步過去。hover 只讀 `data/` 快取，未選 dataset root 也能用；點擊時若主視窗尚未載入 root，會改用快取 meta 重建 `pl.Section` 直接出圖。`hover_report()` 寫成模組層級純函式以利單元測試。headless 旗標（`--batch`／`--examine`／`--config`）直接委派給 `main.py`，行為不變。新增 `test/test_gui2_smoke.py` 6 測試（89/89 通過）。已以真實 121 格快取 headless 驅動驗證 hover／click 與座標對應（(+5,+1)→Z6_1/X0_5、(0,0)→Z5_0/X5_0、(−5,−5)→Z0_-5/X10_-5，符合 project.md §2）。README.md v2.0.9 → 2.1.0、test/README.md v1.1 → 1.2。 |
 | 1.17 | 2026-09-29 | **跨磁碟可攜性**：新增 `bootstrap.py`（v1.0）與 Windows `run.bat`（v1.0）。`bootstrap.py` 開機時檢查 `.venv` 是否可用（能執行 python + 有 numpy/matplotlib/larch），失敗即整個刪除重建並自動 `pip install -r requirements.txt`，然後才 hand off 到 `main.py` 並轉發 argv。這是為了應付把整個專案硬碟移到不同磁碟代號（I: → J:）或不同機器時，`.venv\Scripts\*.exe` 這些 compiled launcher 因為烙印絕對路徑而全部壞掉的情況。`pipeline.py` v1.3 → 1.4：`DATA_ROOT` / `IMAGE_ROOT` 錨定到 `Path(__file__).resolve().parent` 而非 CWD，`python main.py` 從任何 cwd 執行結果都一致。README.md v2.0.8 → 2.0.9：新增 "Preferred: portable one-click launcher" 章節、`§Project docs` 的 discrepancy log 由 `D1-D8` 更新為 `D1-D10`（D5/D8/D9/D10 已結案）、`§Repository layout` 加入 bootstrap.py + run.bat。順手修正 §1 兩個 stale 版本（status.md 1.3 → 1.17；README.md 2.0.3 → 2.0.9）。 |
